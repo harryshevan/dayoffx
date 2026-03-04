@@ -9,6 +9,7 @@ WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY web/. .
+ARG CACHE_BUST=1
 RUN pnpm build
 
 FROM node:20-alpine AS runner

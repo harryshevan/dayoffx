@@ -5,7 +5,7 @@
     "type": "http_bearer",
     "header": "Authorization",
     "format": "Bearer <token>",
-    "notes": "Use a valid MCP token as Bearer token. Admin tools require ADMIN_SECRET."
+    "notes": "Use a valid MCP token as Bearer token (issued tokens use dof_<tokenId>_<secret>). Admin tools require ADMIN_SECRET."
   },
   "tools": [
     {

@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,8 +25,10 @@ import (
 )
 
 type app struct {
-	db          *pgxpool.Pool
-	adminSecret string
+	db                  *pgxpool.Pool
+	adminSecret         string
+	tokenPepper         string
+	legacyTokenFallback bool
 }
 
 type privateCreateUserRequest struct {
@@ -90,6 +96,11 @@ type revokeTokenRequest struct {
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
+const (
+	memberTokenPrefix = "dof"
+	memberTokenV1     = "v1"
+)
+
 func main() {
 	ctx := context.Background()
 
@@ -105,8 +116,27 @@ func main() {
 	defer db.Close()
 
 	handler := &app{
-		db:          db,
-		adminSecret: os.Getenv("ADMIN_SECRET"),
+		db:                  db,
+		adminSecret:         os.Getenv("ADMIN_SECRET"),
+		tokenPepper:         strings.TrimSpace(os.Getenv("TOKEN_PEPPER")),
+		legacyTokenFallback: true,
+	}
+	if handler.tokenPepper == "" {
+		log.Fatal("TOKEN_PEPPER is required")
+	}
+	if flagValue := strings.TrimSpace(os.Getenv("LEGACY_TOKEN_FALLBACK")); flagValue != "" {
+		enabled, err := strconv.ParseBool(flagValue)
+		if err != nil {
+			log.Fatalf("LEGACY_TOKEN_FALLBACK must be a boolean: %v", err)
+		}
+		handler.legacyTokenFallback = enabled
+	}
+	if handler.legacyTokenFallback {
+		exists, err := legacyMCPTokenColumnExists(ctx, db)
+		if err != nil {
+			log.Fatalf("check legacy token column: %v", err)
+		}
+		handler.legacyTokenFallback = exists
 	}
 
 	mux := http.NewServeMux()
@@ -289,21 +319,49 @@ func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) h
 		}
 
 		var ctx authContext
-		err := a.db.QueryRow(
-			r.Context(),
-			`select m.id, c.id, m.role, m.display_name, c.color_hex
-			 from connections c
-			 join members m on m.id = c.member_id
-			 where c.mcp_token = $1 and c.active = true`,
-			token,
-		).Scan(&ctx.MemberID, &ctx.ConnectionID, &ctx.Role, &ctx.CurrentName, &ctx.CurrentColor)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+		if tokenID, tokenSecret, ok := parseMemberToken(token); ok {
+			var storedHash *string
+			err := a.db.QueryRow(
+				r.Context(),
+				`select m.id, c.id, m.role, m.display_name, c.color_hex, c.token_hash
+				 from connections c
+				 join members m on m.id = c.member_id
+				 where c.token_id = $1 and c.active = true`,
+				tokenID,
+			).Scan(&ctx.MemberID, &ctx.ConnectionID, &ctx.Role, &ctx.CurrentName, &ctx.CurrentColor, &storedHash)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					writeError(w, http.StatusUnauthorized, "invalid_token")
+					return
+				}
+				writeError(w, http.StatusInternalServerError, "auth_failed")
+				return
+			}
+			if storedHash == nil || !verifyMemberTokenHash(a.tokenPepper, tokenID, tokenSecret, *storedHash) {
 				writeError(w, http.StatusUnauthorized, "invalid_token")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "auth_failed")
-			return
+		} else {
+			if !a.legacyTokenFallback {
+				writeError(w, http.StatusUnauthorized, "invalid_token")
+				return
+			}
+			err := a.db.QueryRow(
+				r.Context(),
+				`select m.id, c.id, m.role, m.display_name, c.color_hex
+				 from connections c
+				 join members m on m.id = c.member_id
+				 where c.mcp_token = $1 and c.active = true`,
+				token,
+			).Scan(&ctx.MemberID, &ctx.ConnectionID, &ctx.Role, &ctx.CurrentName, &ctx.CurrentColor)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					writeError(w, http.StatusUnauthorized, "invalid_token")
+					return
+				}
+				writeError(w, http.StatusInternalServerError, "auth_failed")
+				return
+			}
 		}
 		ctx.AuthTokenRaw = token
 
@@ -718,13 +776,32 @@ func (a *app) revokeToken(w http.ResponseWriter, r *http.Request, auth authConte
 		return
 	}
 
-	commandTag, err := a.db.Exec(
-		r.Context(),
-		`update connections
-		 set active = false, revoked_at = now()
-		 where mcp_token = $1 and active = true`,
-		token,
+	var (
+		commandTag pgconn.CommandTag
+		err        error
 	)
+	if tokenID, tokenSecret, ok := parseMemberToken(token); ok {
+		commandTag, err = a.db.Exec(
+			r.Context(),
+			`update connections
+			 set active = false, revoked_at = now()
+			 where token_id = $1 and token_hash = $2 and active = true`,
+			tokenID,
+			hashMemberToken(a.tokenPepper, tokenID, tokenSecret),
+		)
+	} else {
+		if !a.legacyTokenFallback {
+			writeError(w, http.StatusNotFound, "token_not_found")
+			return
+		}
+		commandTag, err = a.db.Exec(
+			r.Context(),
+			`update connections
+			 set active = false, revoked_at = now()
+			 where mcp_token = $1 and active = true`,
+			token,
+		)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "token_revoke_failed")
 		return
@@ -761,9 +838,80 @@ func randomColorHex() string {
 	return fmt.Sprintf("#%02x%02x%02x", raw[0], raw[1], raw[2])
 }
 
+func generateMemberToken(pepper string) (string, string, string, string, error) {
+	tokenID, err := randomHex(8)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	secret, err := randomURLSafe(32)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	token := fmt.Sprintf("%s_%s_%s", memberTokenPrefix, tokenID, secret)
+	return token, tokenID, hashMemberToken(pepper, tokenID, secret), memberTokenV1, nil
+}
+
+func randomURLSafe(length int) (string, error) {
+	raw := make([]byte, length)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func randomHex(length int) (string, error) {
+	raw := make([]byte, length)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(raw), nil
+}
+
+func parseMemberToken(token string) (string, string, bool) {
+	parts := strings.SplitN(token, "_", 3)
+	if len(parts) != 3 {
+		return "", "", false
+	}
+	if parts[0] != memberTokenPrefix || parts[1] == "" || parts[2] == "" {
+		return "", "", false
+	}
+	return parts[1], parts[2], true
+}
+
+func hashMemberToken(pepper, tokenID, secret string) string {
+	mac := hmac.New(sha256.New, []byte(pepper))
+	mac.Write([]byte(tokenID))
+	mac.Write([]byte("."))
+	mac.Write([]byte(secret))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func verifyMemberTokenHash(pepper, tokenID, secret, storedHash string) bool {
+	expected := hashMemberToken(pepper, tokenID, secret)
+	return hmac.Equal([]byte(expected), []byte(storedHash))
+}
+
+func legacyMCPTokenColumnExists(ctx context.Context, db *pgxpool.Pool) (bool, error) {
+	var exists bool
+	err := db.QueryRow(
+		ctx,
+		`select exists (
+			select 1
+			from information_schema.columns
+			where table_schema = 'public'
+			  and table_name = 'connections'
+			  and column_name = 'mcp_token'
+		)`,
+	).Scan(&exists)
+	return exists, err
+}
+
 func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex, goal, role string) (createUserResponse, int, string) {
 	memberID := uuid.New()
-	token := uuid.NewString()
+	token, tokenID, tokenHash, tokenVersion, err := generateMemberToken(a.tokenPepper)
+	if err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "token_generation_failed"
+	}
 
 	tx, err := a.db.Begin(ctx)
 	if err != nil {
@@ -782,9 +930,9 @@ func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex,
 
 	if _, err := tx.Exec(
 		ctx,
-		`insert into connections (id, member_id, goal, color_hex, mcp_token, active, created_at, revoked_at)
-		 values ($1, $2, $3, $4, $5, true, now(), null)`,
-		uuid.New(), memberID, goal, colorHex, token,
+		`insert into connections (id, member_id, goal, color_hex, mcp_token, token_id, token_hash, token_version, active, created_at, revoked_at)
+		 values ($1, $2, $3, $4, null, $5, $6, $7, true, now(), null)`,
+		uuid.New(), memberID, goal, colorHex, tokenID, tokenHash, tokenVersion,
 	); err != nil {
 		if isUniqueViolation(err) {
 			return createUserResponse{}, http.StatusConflict, "color_taken_or_duplicate_connection"

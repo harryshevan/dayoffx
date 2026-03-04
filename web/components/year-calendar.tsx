@@ -1,4 +1,5 @@
 import { buildMonthGrid } from "@/lib/calendar";
+import { VacationDots } from "@/components/vacation-dots";
 import { Vacation } from "@/lib/types";
 
 const MONTH_NAMES = [
@@ -31,20 +32,20 @@ export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalen
           <article key={monthName} className="month">
             <h3>{monthName}</h3>
             <div className="day-grid">
-              {days.map((day) => (
-                <div
-                  key={day.date.toISOString()}
-                  className={`day ${day.inCurrentMonth ? "" : "day-muted"} ${
-                    highlightedMemberId && day.vacationMemberId === highlightedMemberId ? "day-highlighted" : ""
-                  }`}
-                  title={day.vacationName ? `${day.vacationName}` : undefined}
-                >
-                  {day.day}
-                  {day.vacationColor ? (
-                    <span className="vac-dot" style={{ background: day.vacationColor }} />
-                  ) : null}
-                </div>
-              ))}
+              {days.map((day) => {
+                return (
+                  <div
+                    key={day.date.toISOString()}
+                    className={`day ${day.inCurrentMonth ? "" : "day-muted"} ${
+                      highlightedMemberId && day.vacationMemberIds?.includes(highlightedMemberId) ? "day-highlighted" : ""
+                    }`}
+                    title={day.vacationNames ? day.vacationNames.join(", ") : undefined}
+                  >
+                    {day.day}
+                    <VacationDots colors={day.vacationColors} />
+                  </div>
+                );
+              })}
             </div>
           </article>
         );

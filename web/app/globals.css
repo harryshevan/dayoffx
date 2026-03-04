@@ -103,13 +103,28 @@ select {
   opacity: 0.35;
 }
 
+.vac-dots {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+}
+
 .vac-dot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
+}
+
+.vac-more {
   position: absolute;
   right: 4px;
-  top: 4px;
+  bottom: 2px;
+  font-size: 0.55rem;
+  line-height: 1;
+  color: #4b5563;
 }
 
 .legend {

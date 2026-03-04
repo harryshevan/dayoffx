@@ -121,6 +121,22 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
+			"changeColor",
+			mcp.WithDescription("Change own profile color"),
+			mcp.WithString("newColor", mcp.Required(), mcp.Description("New profile color #RRGGBB")),
+		),
+		a.changeColor,
+	)
+	s.AddTool(
+		mcp.NewTool(
+			"changeName",
+			mcp.WithDescription("Change own display name"),
+			mcp.WithString("newName", mcp.Required(), mcp.Description("New display name")),
+		),
+		a.changeName,
+	)
+	s.AddTool(
+		mcp.NewTool(
 			"approveVacation",
 			mcp.WithDescription("Approve vacation by id, admin only"),
 			mcp.WithString("vacationId", mcp.Required(), mcp.Description("Vacation id (uuid)")),
@@ -214,6 +230,32 @@ func (a *app) removeVacation(ctx context.Context, req mcp.CallToolRequest) (*mcp
 
 	headers := profileHeaders(req)
 	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodDelete, "/v1/mcp/removeVacation", query, map[string]any{}, headers)
+	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) changeColor(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	newColor, err := req.RequireString("newColor")
+	if err != nil || strings.TrimSpace(newColor) == "" {
+		return mcp.NewToolResultError("newColor_required"), nil
+	}
+
+	payload := map[string]any{
+		"newColor": newColor,
+	}
+	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/changeColor", url.Values{}, payload, nil)
+	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) changeName(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	newName, err := req.RequireString("newName")
+	if err != nil || strings.TrimSpace(newName) == "" {
+		return mcp.NewToolResultError("newName_required"), nil
+	}
+
+	payload := map[string]any{
+		"newName": newName,
+	}
+	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/changeName", url.Values{}, payload, nil)
 	return apiResult(statusCode, body, callErr), nil
 }
 

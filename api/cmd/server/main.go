@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,11 +33,11 @@ type connectRequest struct {
 }
 
 type connectResponse struct {
-	MemberID    string `json:"memberId"`
-	DisplayName string `json:"displayName"`
-	ColorHex    string `json:"colorHex"`
-	Role        string `json:"role"`
-	MCPToken    string `json:"mcpToken"`
+	MemberID     string `json:"memberId"`
+	DisplayName  string `json:"displayName"`
+	ColorHex     string `json:"colorHex"`
+	Role         string `json:"role"`
+	MCPToken     string `json:"mcpToken"`
 	MCPServerURL string `json:"mcpServerUrl"`
 }
 
@@ -62,6 +62,14 @@ type changeVacationRequest struct {
 	NewFrom   string `json:"newFrom"`
 	NewTo     string `json:"newTo"`
 	NewReason string `json:"newReason"`
+}
+
+type changeColorRequest struct {
+	NewColor string `json:"newColor"`
+}
+
+type changeNameRequest struct {
+	NewName string `json:"newName"`
 }
 
 type issueTokenRequest struct {
@@ -109,6 +117,8 @@ func main() {
 	mux.HandleFunc("/v1/mcp/createVacation", handler.auth(handler.createVacation))
 	mux.HandleFunc("/v1/mcp/changeVacation", handler.auth(handler.changeVacation))
 	mux.HandleFunc("/v1/mcp/removeVacation", handler.auth(handler.removeVacation))
+	mux.HandleFunc("/v1/mcp/changeColor", handler.auth(handler.changeColor))
+	mux.HandleFunc("/v1/mcp/changeName", handler.auth(handler.changeName))
 	mux.HandleFunc("/v1/mcp/approveVacation", handler.auth(handler.approveVacation))
 	mux.HandleFunc("/v1/mcp/issueToken", handler.auth(handler.issueToken))
 	mux.HandleFunc("/v1/mcp/revokeToken", handler.auth(handler.revokeToken))
@@ -216,11 +226,11 @@ func (a *app) connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, connectResponse{
-		MemberID:    memberID.String(),
-		DisplayName: req.DisplayName,
-		ColorHex:    strings.ToLower(req.ColorHex),
-		Role:        role,
-		MCPToken:    token,
+		MemberID:     memberID.String(),
+		DisplayName:  req.DisplayName,
+		ColorHex:     strings.ToLower(req.ColorHex),
+		Role:         role,
+		MCPToken:     token,
 		MCPServerURL: os.Getenv("MCP_SERVER_URL"),
 	})
 }
@@ -260,9 +270,9 @@ func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
 	result := make([]vacationDTO, 0)
 	for rows.Next() {
 		var (
-			item            vacationDTO
-			id              uuid.UUID
-			memberID        uuid.UUID
+			item             vacationDTO
+			id               uuid.UUID
+			memberID         uuid.UUID
 			fromDate, toDate time.Time
 		)
 		if err := rows.Scan(&id, &memberID, &item.DisplayName, &item.ColorHex, &fromDate, &toDate, &item.Reason, &item.Status); err != nil {
@@ -280,13 +290,13 @@ func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
 }
 
 type authContext struct {
-	MemberID      uuid.UUID
-	ConnectionID  uuid.UUID
-	Role          string
-	IsEnvAdmin    bool
-	CurrentName   string
-	CurrentColor  string
-	AuthTokenRaw  string
+	MemberID     uuid.UUID
+	ConnectionID uuid.UUID
+	Role         string
+	IsEnvAdmin   bool
+	CurrentName  string
+	CurrentColor string
+	AuthTokenRaw string
 }
 
 func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) http.HandlerFunc {
@@ -523,6 +533,88 @@ func (a *app) removeVacation(w http.ResponseWriter, r *http.Request, auth authCo
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"vacationId": vacationID.String()})
+}
+
+func (a *app) changeColor(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "member_token_required")
+		return
+	}
+
+	var req changeColorRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	newColor := strings.ToLower(strings.TrimSpace(req.NewColor))
+	if !colorPattern.MatchString(newColor) {
+		writeError(w, http.StatusBadRequest, "invalid_color")
+		return
+	}
+
+	commandTag, err := a.db.Exec(
+		r.Context(),
+		`update connections set color_hex = $1 where id = $2 and active = true`,
+		newColor, auth.ConnectionID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, http.StatusConflict, "color_taken")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "profile_color_update_failed")
+		return
+	}
+	if commandTag.RowsAffected() == 0 {
+		writeError(w, http.StatusNotFound, "connection_not_found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"colorHex": newColor})
+}
+
+func (a *app) changeName(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "member_token_required")
+		return
+	}
+
+	var req changeNameRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	newName := strings.TrimSpace(req.NewName)
+	if newName == "" {
+		writeError(w, http.StatusBadRequest, "invalid_name")
+		return
+	}
+
+	commandTag, err := a.db.Exec(
+		r.Context(),
+		`update members set display_name = $1 where id = $2`,
+		newName, auth.MemberID,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "profile_name_update_failed")
+		return
+	}
+	if commandTag.RowsAffected() == 0 {
+		writeError(w, http.StatusNotFound, "member_not_found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"displayName": newName})
 }
 
 func (a *app) approveVacation(w http.ResponseWriter, r *http.Request, auth authContext) {

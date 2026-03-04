@@ -4,9 +4,9 @@ export type DayCell = {
   day: number;
   date: Date;
   inCurrentMonth: boolean;
-  vacationColor?: string;
-  vacationName?: string;
-  vacationMemberId?: string;
+  vacationColors?: string[];
+  vacationNames?: string[];
+  vacationMemberIds?: string[];
 };
 
 const WEEK_START_MONDAY = 1;
@@ -29,14 +29,14 @@ export function buildMonthGrid(year: number, monthIndex: number, vacations: Vaca
     date.setUTCDate(gridStart.getUTCDate() + index);
     const dateString = toIsoDateString(date);
 
-    const vacation = vacations.find((item) => dateString >= item.fromDate && dateString <= item.toDate);
+    const vacationsForDay = vacations.filter((item) => dateString >= item.fromDate && dateString <= item.toDate);
     return {
       day: date.getUTCDate(),
       date,
       inCurrentMonth: date.getUTCMonth() === monthIndex,
-      vacationColor: vacation?.colorHex,
-      vacationName: vacation?.displayName,
-      vacationMemberId: vacation?.memberId
+      vacationColors: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.colorHex) : undefined,
+      vacationNames: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.displayName) : undefined,
+      vacationMemberIds: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.memberId) : undefined
     };
   });
 }

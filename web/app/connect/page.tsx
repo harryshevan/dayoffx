@@ -4,8 +4,10 @@ import { FormEvent, useMemo, useState } from "react";
 import { connectMember } from "@/lib/api";
 import { Goal, MemberConnection } from "@/lib/types";
 
+const MCP_SERVER_NAME = "dayoff-mcp";
+
 const GOAL_INSTRUCTIONS: Record<Goal, string> = {
-  cursor: "Скопируйте MCP URL и добавьте его в Cursor -> Settings -> MCP -> Add server.",
+  cursor: "Скопируйте JSON и вставьте в Cursor MCP settings (mcp.json).",
   claude_desktop: "Скопируйте MCP URL и вставьте его в конфиг Claude Desktop (mcpServers).",
   other: "Используйте MCP URL и token в любом клиенте с поддержкой Model Context Protocol."
 };
@@ -29,6 +31,7 @@ export default function ConnectPage() {
   const [adminSecret, setAdminSecret] = useState("");
   const [connection, setConnection] = useState<MemberConnection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const instruction = useMemo(() => GOAL_INSTRUCTIONS[goal], [goal]);
@@ -37,10 +40,52 @@ export default function ConnectPage() {
     await navigator.clipboard.writeText(value);
   }
 
+  async function copyWithStatus(value: string, successMessage: string) {
+    try {
+      await copyText(value);
+      setCopyStatus(successMessage);
+    } catch {
+      setCopyStatus("Не удалось скопировать. Скопируйте вручную.");
+    }
+  }
+
+  const mcpServerUrl = connection?.mcpServerUrl || "";
+  const serverBlockJson = useMemo(() => {
+    if (!connection) {
+      return "";
+    }
+    return JSON.stringify(
+      {
+        [MCP_SERVER_NAME]: {
+          url: mcpServerUrl || "https://YOUR_MCP_SERVER_URL/mcp",
+          headers: {
+            Authorization: `Bearer ${connection.mcpToken}`
+          }
+        }
+      },
+      null,
+      2
+    );
+  }, [connection, mcpServerUrl]);
+
+  const fullMcpJson = useMemo(() => {
+    if (!connection) {
+      return "";
+    }
+    return JSON.stringify(
+      {
+        mcpServers: JSON.parse(serverBlockJson)
+      },
+      null,
+      2
+    );
+  }, [connection, serverBlockJson]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setCopyStatus(null);
     setConnection(null);
 
     try {
@@ -123,6 +168,7 @@ export default function ConnectPage() {
         </form>
 
         {error ? <p style={{ color: "#dc2626" }}>{error}</p> : null}
+        {copyStatus ? <p style={{ color: "#047857", margin: 0 }}>{copyStatus}</p> : null}
 
         {connection ? (
           <div className="card" style={{ marginTop: "0.75rem" }}>
@@ -142,6 +188,46 @@ export default function ConnectPage() {
               <button type="button" className="btn" onClick={() => copyText(connection.mcpToken)}>
                 Скопировать token
               </button>
+            </div>
+            <div className="grid" style={{ marginTop: "0.75rem" }}>
+              <strong>Готовый JSON для Cursor</strong>
+              {!mcpServerUrl ? (
+                <div style={{ color: "#b45309" }}>
+                  `MCP_SERVER_URL` не настроен в API. Подставьте URL вручную перед сохранением.
+                </div>
+              ) : null}
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => copyWithStatus(fullMcpJson, "Скопирован полный mcp.json")}
+                >
+                  Скопировать mcp.json целиком
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => copyWithStatus(serverBlockJson, "Скопирован блок сервера")}
+                >
+                  Скопировать только server block
+                </button>
+              </div>
+              <label className="grid" style={{ gap: "0.35rem" }}>
+                Полный mcp.json
+                <textarea
+                  readOnly
+                  value={fullMcpJson}
+                  style={{ width: "100%", minHeight: 160, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+                />
+              </label>
+              <label className="grid" style={{ gap: "0.35rem" }}>
+                Только server block
+                <textarea
+                  readOnly
+                  value={serverBlockJson}
+                  style={{ width: "100%", minHeight: 120, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+                />
+              </label>
             </div>
           </div>
         ) : null}

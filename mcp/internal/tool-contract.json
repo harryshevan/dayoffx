@@ -1,10 +1,11 @@
 {
   "name": "dayoffs-mcp-tools",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "authentication": {
-    "type": "token",
-    "field": "token",
-    "notes": "Use member token from /v1/connect response."
+    "type": "http_bearer",
+    "header": "Authorization",
+    "format": "Bearer <token>",
+    "notes": "Use token from /v1/connect response as Bearer token."
   },
   "tools": [
     {

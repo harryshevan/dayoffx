@@ -12,3 +12,7 @@ tmp
 .pnpm-store
 *.tsbuildinfo
 supabase/.temp
+.gocache
+.gopath
+api/server
+mcp/server

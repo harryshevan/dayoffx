@@ -81,22 +81,6 @@ export default function CalendarPage() {
 
   return (
     <main className="grid">
-      <section className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0 }}>Yearly vacation calendar</h1>
-          <label>
-            Year{" "}
-            <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
-              {yearOptions.map((optionYear) => (
-                <option key={optionYear} value={optionYear}>
-                  {optionYear}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
-
       {legendByMember.length > 0 ? (
         <section ref={legendRef} className="legend">
           {legendByMember.map((item) => (
@@ -119,7 +103,21 @@ export default function CalendarPage() {
       {error ? <section className="card">Error: {error}</section> : null}
       {loading ? <section className="card">Loading calendar...</section> : null}
       {!loading && !error ? (
-        <YearCalendar year={year} vacations={vacations} highlightedMemberId={highlightedMemberId} />
+        <>
+          <section className="calendar-controls">
+            <label className="calendar-year-select">
+              Year{" "}
+              <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
+                {yearOptions.map((optionYear) => (
+                  <option key={optionYear} value={optionYear}>
+                    {optionYear}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+          <YearCalendar year={year} vacations={vacations} highlightedMemberId={highlightedMemberId} />
+        </>
       ) : null}
     </main>
   );

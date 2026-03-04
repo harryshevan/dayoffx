@@ -39,6 +39,8 @@ func main() {
 	mux.HandleFunc("/tools/changeVacation", forward(apiBaseURL, "/v1/mcp/changeVacation", http.MethodPatch))
 	mux.HandleFunc("/tools/removeVacation", forward(apiBaseURL, "/v1/mcp/removeVacation", http.MethodDelete))
 	mux.HandleFunc("/tools/approveVacation", forward(apiBaseURL, "/v1/mcp/approveVacation", http.MethodPost))
+	mux.HandleFunc("/tools/issueToken", forward(apiBaseURL, "/v1/mcp/issueToken", http.MethodPost))
+	mux.HandleFunc("/tools/revokeToken", forward(apiBaseURL, "/v1/mcp/revokeToken", http.MethodPost))
 
 	server := &http.Server{
 		Addr:         ":" + port,
@@ -65,22 +67,32 @@ func toolsList(w http.ResponseWriter, r *http.Request) {
 			{
 				"name":        "createVacation",
 				"description": "Create a vacation request",
-				"arguments":   []string{"from", "to", "reason"},
+				"arguments":   []string{"from", "to", "reason", "displayName(optional)", "colorHex(optional)"},
 			},
 			{
 				"name":        "changeVacation",
 				"description": "Change existing vacation by id",
-				"arguments":   []string{"vacationId", "newFrom", "newTo", "newReason"},
+				"arguments":   []string{"vacationId", "newFrom", "newTo", "newReason", "displayName(optional)", "colorHex(optional)"},
 			},
 			{
 				"name":        "removeVacation",
 				"description": "Remove existing vacation by id",
-				"arguments":   []string{"vacationId"},
+				"arguments":   []string{"vacationId", "displayName(optional)", "colorHex(optional)"},
 			},
 			{
 				"name":        "approveVacation",
 				"description": "Approve vacation by id, admin only",
 				"arguments":   []string{"vacationId"},
+			},
+			{
+				"name":        "issueToken",
+				"description": "Issue new member token, env-admin only",
+				"arguments":   []string{"displayName(optional)", "colorHex(optional)", "goal(optional)"},
+			},
+			{
+				"name":        "revokeToken",
+				"description": "Revoke member token, env-admin only",
+				"arguments":   []string{"token"},
 			},
 		},
 	})
@@ -139,6 +151,21 @@ func forward(apiBaseURL, targetPath, expectedMethod string) http.HandlerFunc {
 			payload["newFrom"] = req.Arguments["newFrom"]
 			payload["newTo"] = req.Arguments["newTo"]
 			payload["newReason"] = req.Arguments["newReason"]
+		case "/v1/mcp/issueToken":
+			if value, ok := optionalStringArg(req.Arguments, "displayName"); ok {
+				payload["displayName"] = value
+			}
+			if value, ok := optionalStringArg(req.Arguments, "colorHex"); ok {
+				payload["colorHex"] = value
+			}
+			if value, ok := optionalStringArg(req.Arguments, "goal"); ok {
+				payload["goal"] = value
+			}
+		case "/v1/mcp/revokeToken":
+			if !requireStringArg(w, req.Arguments, "token") {
+				return
+			}
+			payload["token"] = req.Arguments["token"]
 		}
 
 		body, _ := json.Marshal(payload)
@@ -149,6 +176,12 @@ func forward(apiBaseURL, targetPath, expectedMethod string) http.HandlerFunc {
 		}
 		outReq.Header.Set("Content-Type", "application/json")
 		outReq.Header.Set("Authorization", "Bearer "+req.Token)
+		if value, ok := optionalStringArg(req.Arguments, "displayName"); ok {
+			outReq.Header.Set("X-Profile-Name", value)
+		}
+		if value, ok := optionalStringArg(req.Arguments, "colorHex"); ok {
+			outReq.Header.Set("X-Profile-Color", strings.ToLower(value))
+		}
 
 		response, err := client.Do(outReq)
 		if err != nil {
@@ -162,6 +195,18 @@ func forward(apiBaseURL, targetPath, expectedMethod string) http.HandlerFunc {
 		w.WriteHeader(response.StatusCode)
 		_, _ = w.Write(respBody)
 	}
+}
+
+func optionalStringArg(args map[string]any, key string) (string, bool) {
+	value, ok := args[key].(string)
+	if !ok {
+		return "", false
+	}
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", false
+	}
+	return trimmed, true
 }
 
 func requireStringArg(w http.ResponseWriter, args map[string]any, key string) bool {

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -62,6 +64,23 @@ type changeVacationRequest struct {
 	NewReason string `json:"newReason"`
 }
 
+type issueTokenRequest struct {
+	DisplayName string `json:"displayName"`
+	ColorHex    string `json:"colorHex"`
+	Goal        string `json:"goal"`
+}
+
+type issueTokenResponse struct {
+	MemberID    string `json:"memberId"`
+	DisplayName string `json:"displayName"`
+	ColorHex    string `json:"colorHex"`
+	MCPToken    string `json:"mcpToken"`
+}
+
+type revokeTokenRequest struct {
+	Token string `json:"token"`
+}
+
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 func main() {
@@ -91,6 +110,8 @@ func main() {
 	mux.HandleFunc("/v1/mcp/changeVacation", handler.auth(handler.changeVacation))
 	mux.HandleFunc("/v1/mcp/removeVacation", handler.auth(handler.removeVacation))
 	mux.HandleFunc("/v1/mcp/approveVacation", handler.auth(handler.approveVacation))
+	mux.HandleFunc("/v1/mcp/issueToken", handler.auth(handler.issueToken))
+	mux.HandleFunc("/v1/mcp/revokeToken", handler.auth(handler.revokeToken))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -114,7 +135,7 @@ func main() {
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-MCP-Token")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-MCP-Token, X-Profile-Name, X-Profile-Color")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -259,8 +280,13 @@ func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
 }
 
 type authContext struct {
-	MemberID uuid.UUID
-	Role     string
+	MemberID      uuid.UUID
+	ConnectionID  uuid.UUID
+	Role          string
+	IsEnvAdmin    bool
+	CurrentName   string
+	CurrentColor  string
+	AuthTokenRaw  string
 }
 
 func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) http.HandlerFunc {
@@ -274,15 +300,24 @@ func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) h
 			return
 		}
 
+		if a.adminSecret != "" && token == a.adminSecret {
+			next(w, r, authContext{
+				Role:         "admin",
+				IsEnvAdmin:   true,
+				AuthTokenRaw: token,
+			})
+			return
+		}
+
 		var ctx authContext
 		err := a.db.QueryRow(
 			r.Context(),
-			`select m.id, m.role
+			`select m.id, c.id, m.role, m.display_name, c.color_hex
 			 from connections c
 			 join members m on m.id = c.member_id
 			 where c.mcp_token = $1 and c.active = true`,
 			token,
-		).Scan(&ctx.MemberID, &ctx.Role)
+		).Scan(&ctx.MemberID, &ctx.ConnectionID, &ctx.Role, &ctx.CurrentName, &ctx.CurrentColor)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				writeError(w, http.StatusUnauthorized, "invalid_token")
@@ -291,14 +326,84 @@ func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) h
 			writeError(w, http.StatusInternalServerError, "auth_failed")
 			return
 		}
+		ctx.AuthTokenRaw = token
 
 		next(w, r, ctx)
 	}
 }
 
+func parseProfileHeaders(r *http.Request) (string, string) {
+	name := strings.TrimSpace(r.Header.Get("X-Profile-Name"))
+	color := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Profile-Color")))
+	return name, color
+}
+
+func (a *app) syncProfileFromHeaders(w http.ResponseWriter, r *http.Request, auth authContext) bool {
+	if auth.IsEnvAdmin {
+		return true
+	}
+
+	nextName, nextColor := parseProfileHeaders(r)
+	if nextName == "" && nextColor == "" {
+		return true
+	}
+
+	tx, err := a.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_begin_failed")
+		return false
+	}
+	defer tx.Rollback(r.Context())
+
+	if nextName != "" && nextName != auth.CurrentName {
+		if _, err := tx.Exec(
+			r.Context(),
+			`update members set display_name = $1 where id = $2`,
+			nextName, auth.MemberID,
+		); err != nil {
+			writeError(w, http.StatusInternalServerError, "profile_name_update_failed")
+			return false
+		}
+	}
+
+	if nextColor != "" {
+		if !colorPattern.MatchString(nextColor) {
+			writeError(w, http.StatusBadRequest, "invalid_profile_color")
+			return false
+		}
+		if nextColor != auth.CurrentColor {
+			if _, err := tx.Exec(
+				r.Context(),
+				`update connections set color_hex = $1 where id = $2 and active = true`,
+				nextColor, auth.ConnectionID,
+			); err != nil {
+				if isUniqueViolation(err) {
+					writeError(w, http.StatusConflict, "color_taken")
+					return false
+				}
+				writeError(w, http.StatusInternalServerError, "profile_color_update_failed")
+				return false
+			}
+		}
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, "db_commit_failed")
+		return false
+	}
+	return true
+}
+
 func (a *app) createVacation(w http.ResponseWriter, r *http.Request, auth authContext) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "member_token_required")
+		return
+	}
+	if !a.syncProfileFromHeaders(w, r, auth) {
 		return
 	}
 
@@ -333,6 +438,13 @@ func (a *app) createVacation(w http.ResponseWriter, r *http.Request, auth authCo
 func (a *app) changeVacation(w http.ResponseWriter, r *http.Request, auth authContext) {
 	if r.Method != http.MethodPatch {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "member_token_required")
+		return
+	}
+	if !a.syncProfileFromHeaders(w, r, auth) {
 		return
 	}
 
@@ -378,6 +490,13 @@ func (a *app) changeVacation(w http.ResponseWriter, r *http.Request, auth authCo
 func (a *app) removeVacation(w http.ResponseWriter, r *http.Request, auth authContext) {
 	if r.Method != http.MethodDelete {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "member_token_required")
+		return
+	}
+	if !a.syncProfileFromHeaders(w, r, auth) {
 		return
 	}
 
@@ -460,6 +579,157 @@ func (a *app) approveVacation(w http.ResponseWriter, r *http.Request, auth authC
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"vacationId": vacationID.String(), "status": "approved"})
+}
+
+func (a *app) issueToken(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "env_admin_only")
+		return
+	}
+
+	var req issueTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" {
+		displayName = fmt.Sprintf("member-%s", randomSuffix(6))
+	}
+
+	goal := strings.TrimSpace(req.Goal)
+	if goal == "" {
+		goal = "other"
+	}
+
+	colorHex := strings.ToLower(strings.TrimSpace(req.ColorHex))
+	if colorHex == "" {
+		colorHex = randomColorHex()
+	}
+	if !colorPattern.MatchString(colorHex) {
+		writeError(w, http.StatusBadRequest, "invalid_color")
+		return
+	}
+
+	memberID := uuid.New()
+	token := uuid.NewString()
+
+	tx, err := a.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_begin_failed")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	if _, err := tx.Exec(
+		r.Context(),
+		`insert into members (id, display_name, role, created_at)
+		 values ($1, $2, 'member', now())`,
+		memberID, displayName,
+	); err != nil {
+		writeError(w, http.StatusInternalServerError, "member_create_failed")
+		return
+	}
+
+	if _, err := tx.Exec(
+		r.Context(),
+		`insert into connections (id, member_id, goal, color_hex, mcp_token, active, created_at, revoked_at)
+		 values ($1, $2, $3, $4, $5, true, now(), null)`,
+		uuid.New(), memberID, goal, colorHex, token,
+	); err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, http.StatusConflict, "color_taken_or_duplicate_connection")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "connection_create_failed")
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, "db_commit_failed")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, issueTokenResponse{
+		MemberID:    memberID.String(),
+		DisplayName: displayName,
+		ColorHex:    colorHex,
+		MCPToken:    token,
+	})
+}
+
+func (a *app) revokeToken(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "env_admin_only")
+		return
+	}
+
+	var req revokeTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	token := strings.TrimSpace(req.Token)
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "token_required")
+		return
+	}
+	if token == a.adminSecret {
+		writeError(w, http.StatusBadRequest, "cannot_revoke_admin_secret")
+		return
+	}
+
+	commandTag, err := a.db.Exec(
+		r.Context(),
+		`update connections
+		 set active = false, revoked_at = now()
+		 where mcp_token = $1 and active = true`,
+		token,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "token_revoke_failed")
+		return
+	}
+	if commandTag.RowsAffected() == 0 {
+		writeError(w, http.StatusNotFound, "token_not_found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
+}
+
+func randomSuffix(length int) string {
+	if length <= 0 {
+		return ""
+	}
+	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+	raw := make([]byte, length)
+	if _, err := rand.Read(raw); err != nil {
+		return "member"
+	}
+	out := make([]byte, length)
+	for i := 0; i < length; i++ {
+		out[i] = alphabet[int(raw[i])%len(alphabet)]
+	}
+	return string(out)
+}
+
+func randomColorHex() string {
+	raw := make([]byte, 3)
+	if _, err := rand.Read(raw); err != nil {
+		return "#3b82f6"
+	}
+	return fmt.Sprintf("#%02x%02x%02x", raw[0], raw[1], raw[2])
 }
 
 func parseDateRange(fromRaw, toRaw string) (time.Time, time.Time, bool) {

@@ -12,7 +12,9 @@
       "arguments": {
         "from": "YYYY-MM-DD",
         "to": "YYYY-MM-DD",
-        "reason": "string"
+        "reason": "string",
+        "displayName": "string optional",
+        "colorHex": "#RRGGBB optional"
       },
       "behavior": "Creates pending vacation for token owner."
     },
@@ -22,14 +24,18 @@
         "vacationId": "uuid",
         "newFrom": "YYYY-MM-DD",
         "newTo": "YYYY-MM-DD",
-        "newReason": "string"
+        "newReason": "string",
+        "displayName": "string optional",
+        "colorHex": "#RRGGBB optional"
       },
       "behavior": "Changes token owner's vacation and resets status to pending."
     },
     {
       "name": "removeVacation",
       "arguments": {
-        "vacationId": "uuid"
+        "vacationId": "uuid",
+        "displayName": "string optional",
+        "colorHex": "#RRGGBB optional"
       },
       "behavior": "Removes token owner's vacation."
     },
@@ -39,6 +45,22 @@
         "vacationId": "uuid"
       },
       "behavior": "Admin-only. Approves vacation and writes audit record."
+    },
+    {
+      "name": "issueToken",
+      "arguments": {
+        "displayName": "string optional",
+        "colorHex": "#RRGGBB optional",
+        "goal": "cursor|claude_desktop|other optional"
+      },
+      "behavior": "Admin-only. Uses env ADMIN_SECRET as caller token and issues a new member token."
+    },
+    {
+      "name": "revokeToken",
+      "arguments": {
+        "token": "string"
+      },
+      "behavior": "Admin-only. Revokes active member token."
     }
   ]
 }

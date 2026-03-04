@@ -83,9 +83,9 @@ export default function CalendarPage() {
     <main className="grid">
       <section className="card">
         <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0 }}>Годовой календарь отпусков</h1>
+          <h1 style={{ margin: 0 }}>Yearly vacation calendar</h1>
           <label>
-            Год{" "}
+            Year{" "}
             <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
               {yearOptions.map((optionYear) => (
                 <option key={optionYear} value={optionYear}>
@@ -116,8 +116,8 @@ export default function CalendarPage() {
         </section>
       ) : null}
 
-      {error ? <section className="card">Ошибка: {error}</section> : null}
-      {loading ? <section className="card">Загружаем календарь...</section> : null}
+      {error ? <section className="card">Error: {error}</section> : null}
+      {loading ? <section className="card">Loading calendar...</section> : null}
       {!loading && !error ? (
         <YearCalendar year={year} vacations={vacations} highlightedMemberId={highlightedMemberId} />
       ) : null}

@@ -6,11 +6,11 @@ export default function HomePage() {
       <section className="card">
         <h1 style={{ marginTop: 0 }}>Team vacation plans</h1>
         <p>
-          Connect MCP, pick your unique color, and manage vacations from your favorite GPT interface.
+          Connect to team MCP, then manage vacations from your favorite GPT interface.
         </p>
         <div style={{ display: "flex", gap: "0.75rem" }}>
-          <Link href="/connect" className="btn btn-primary" style={{ textDecoration: "none" }}>
-            Connect
+          <Link href="/onboard" className="btn btn-primary" style={{ textDecoration: "none" }}>
+            Start onboarding
           </Link>
           <Link href="/calendar" className="btn" style={{ textDecoration: "none", border: "1px solid #d1d5db" }}>
             Open calendar

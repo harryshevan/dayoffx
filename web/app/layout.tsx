@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </Link>
             <nav style={{ display: "flex", gap: "0.75rem" }}>
               <Link href="/calendar">Calendar</Link>
-              <Link href="/connect">Connect</Link>
+              <Link href="/onboard">Onboard</Link>
             </nav>
           </header>
           {children}

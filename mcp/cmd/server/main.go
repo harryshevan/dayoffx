@@ -18,14 +18,19 @@ import (
 )
 
 type app struct {
-	apiBaseURL string
-	client     *http.Client
+	apiBaseURL  string
+	adminSecret string
+	client      *http.Client
 }
 
 func main() {
 	apiBaseURL := strings.TrimRight(os.Getenv("API_BASE_URL"), "/")
 	if apiBaseURL == "" {
 		log.Fatal("API_BASE_URL is required")
+	}
+	adminSecret := strings.TrimSpace(os.Getenv("ADMIN_SECRET"))
+	if adminSecret == "" {
+		log.Fatal("ADMIN_SECRET is required")
 	}
 
 	port := os.Getenv("PORT")
@@ -34,8 +39,9 @@ func main() {
 	}
 
 	application := &app{
-		apiBaseURL: apiBaseURL,
-		client:     &http.Client{Timeout: 15 * time.Second},
+		apiBaseURL:  apiBaseURL,
+		adminSecret: adminSecret,
+		client:      &http.Client{Timeout: 15 * time.Second},
 	}
 
 	mcpServer := server.NewMCPServer(
@@ -84,6 +90,16 @@ func requireBearer(next http.Handler) http.Handler {
 }
 
 func (a *app) registerTools(s *server.MCPServer) {
+	s.AddTool(
+		mcp.NewTool(
+			"createUser",
+			mcp.WithDescription("Create a new member and return MCP token, env-admin only"),
+			mcp.WithString("displayName", mcp.Description("Optional member display name")),
+			mcp.WithString("colorHex", mcp.Description("Optional member color #RRGGBB")),
+			mcp.WithString("goal", mcp.Description("Optional goal: cursor|claude_desktop|other")),
+		),
+		a.createUser,
+	)
 	s.AddTool(
 		mcp.NewTool(
 			"createVacation",
@@ -185,6 +201,26 @@ func (a *app) createVacation(ctx context.Context, req mcp.CallToolRequest) (*mcp
 
 	headers := profileHeaders(req)
 	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/createVacation", url.Values{}, payload, headers)
+	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) createUser(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if extractBearer(req.Header) != a.adminSecret {
+		return mcp.NewToolResultError("env_admin_only"), nil
+	}
+
+	payload := map[string]any{}
+	if value := strings.TrimSpace(req.GetString("displayName", "")); value != "" {
+		payload["displayName"] = value
+	}
+	if value := strings.TrimSpace(req.GetString("colorHex", "")); value != "" {
+		payload["colorHex"] = value
+	}
+	if value := strings.TrimSpace(req.GetString("goal", "")); value != "" {
+		payload["goal"] = value
+	}
+
+	statusCode, body, callErr := a.callAPIAsEnvAdmin(ctx, http.MethodPost, "/v1/private/users", url.Values{}, payload, nil)
 	return apiResult(statusCode, body, callErr), nil
 }
 
@@ -311,6 +347,30 @@ func (a *app) callAPI(
 		return http.StatusUnauthorized, nil, errors.New("missing_or_invalid_authorization")
 	}
 
+	return a.callAPIWithAuthorization(ctx, authValue, method, path, query, payload, extraHeaders)
+}
+
+func (a *app) callAPIAsEnvAdmin(
+	ctx context.Context,
+	method string,
+	path string,
+	query url.Values,
+	payload map[string]any,
+	extraHeaders map[string]string,
+) (int, []byte, error) {
+	authValue := "Bearer " + a.adminSecret
+	return a.callAPIWithAuthorization(ctx, authValue, method, path, query, payload, extraHeaders)
+}
+
+func (a *app) callAPIWithAuthorization(
+	ctx context.Context,
+	authValue string,
+	method string,
+	path string,
+	query url.Values,
+	payload map[string]any,
+	extraHeaders map[string]string,
+) (int, []byte, error) {
 	targetURL := a.apiBaseURL + path
 	if encoded := query.Encode(); encoded != "" {
 		targetURL += "?" + encoded

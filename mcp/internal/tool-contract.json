@@ -5,9 +5,18 @@
     "type": "http_bearer",
     "header": "Authorization",
     "format": "Bearer <token>",
-    "notes": "Use token from /v1/connect response as Bearer token."
+    "notes": "Use a valid MCP token as Bearer token. Admin tools require ADMIN_SECRET."
   },
   "tools": [
+    {
+      "name": "createUser",
+      "arguments": {
+        "displayName": "string optional",
+        "colorHex": "#RRGGBB optional",
+        "goal": "cursor|claude_desktop|other optional"
+      },
+      "behavior": "Env-admin only. Creates a member via private API and returns a new MCP token."
+    },
     {
       "name": "createVacation",
       "arguments": {

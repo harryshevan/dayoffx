@@ -25,14 +25,13 @@ type app struct {
 	adminSecret string
 }
 
-type connectRequest struct {
+type privateCreateUserRequest struct {
 	DisplayName string `json:"displayName"`
-	Goal        string `json:"goal"`
 	ColorHex    string `json:"colorHex"`
-	AdminSecret string `json:"adminSecret"`
+	Goal        string `json:"goal"`
 }
 
-type connectResponse struct {
+type createUserResponse struct {
 	MemberID     string `json:"memberId"`
 	DisplayName  string `json:"displayName"`
 	ColorHex     string `json:"colorHex"`
@@ -112,7 +111,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", handler.healthz)
-	mux.HandleFunc("/v1/connect", handler.connect)
+	mux.HandleFunc("/v1/private/users", handler.auth(handler.createPrivateUser))
 	mux.HandleFunc("/v1/vacations", handler.listVacations)
 	mux.HandleFunc("/v1/mcp/createVacation", handler.auth(handler.createVacation))
 	mux.HandleFunc("/v1/mcp/changeVacation", handler.auth(handler.changeVacation))
@@ -160,79 +159,49 @@ func (a *app) healthz(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-func (a *app) connect(w http.ResponseWriter, r *http.Request) {
+func (a *app) createPrivateUser(w http.ResponseWriter, r *http.Request, auth authContext) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 		return
 	}
+	if !auth.IsEnvAdmin {
+		writeError(w, http.StatusForbidden, "env_admin_only")
+		return
+	}
 
-	var req connectRequest
+	var req privateCreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
 
-	req.DisplayName = strings.TrimSpace(req.DisplayName)
-	req.Goal = strings.TrimSpace(req.Goal)
-	req.ColorHex = strings.TrimSpace(req.ColorHex)
+	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" {
+		displayName = fmt.Sprintf("member-%s", randomSuffix(6))
+	}
 
-	if req.DisplayName == "" || req.Goal == "" || !colorPattern.MatchString(req.ColorHex) {
-		writeError(w, http.StatusBadRequest, "invalid_connect_payload")
+	goal := strings.TrimSpace(req.Goal)
+	if goal == "" {
+		goal = "other"
+	}
+
+	colorHex := strings.ToLower(strings.TrimSpace(req.ColorHex))
+	if colorHex == "" {
+		colorHex = randomColorHex()
+	}
+	if !colorPattern.MatchString(colorHex) {
+		writeError(w, http.StatusBadRequest, "invalid_color")
 		return
 	}
 
-	role := "member"
-	if a.adminSecret != "" && req.AdminSecret != "" && req.AdminSecret == a.adminSecret {
-		role = "admin"
-	}
-
-	memberID := uuid.New()
-	token := uuid.NewString()
-
-	tx, err := a.db.Begin(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "db_begin_failed")
-		return
-	}
-	defer tx.Rollback(r.Context())
-
-	if _, err := tx.Exec(
-		r.Context(),
-		`insert into members (id, display_name, role, created_at)
-		 values ($1, $2, $3, now())`,
-		memberID, req.DisplayName, role,
-	); err != nil {
-		writeError(w, http.StatusInternalServerError, "member_create_failed")
+	result, statusCode, errorCode := a.createMemberConnection(r.Context(), displayName, colorHex, goal, "member")
+	if errorCode != "" {
+		writeError(w, statusCode, errorCode)
 		return
 	}
 
-	if _, err := tx.Exec(
-		r.Context(),
-		`insert into connections (id, member_id, goal, color_hex, mcp_token, active, created_at)
-		 values ($1, $2, $3, $4, $5, true, now())`,
-		uuid.New(), memberID, req.Goal, strings.ToLower(req.ColorHex), token,
-	); err != nil {
-		if isUniqueViolation(err) {
-			writeError(w, http.StatusConflict, "color_taken_or_duplicate_connection")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "connection_create_failed")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		writeError(w, http.StatusInternalServerError, "db_commit_failed")
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, connectResponse{
-		MemberID:     memberID.String(),
-		DisplayName:  req.DisplayName,
-		ColorHex:     strings.ToLower(req.ColorHex),
-		Role:         role,
-		MCPToken:     token,
-		MCPServerURL: os.Getenv("MCP_SERVER_URL"),
-	})
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusCreated, result)
 }
 
 func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
@@ -708,50 +677,18 @@ func (a *app) issueToken(w http.ResponseWriter, r *http.Request, auth authContex
 		return
 	}
 
-	memberID := uuid.New()
-	token := uuid.NewString()
-
-	tx, err := a.db.Begin(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "db_begin_failed")
-		return
-	}
-	defer tx.Rollback(r.Context())
-
-	if _, err := tx.Exec(
-		r.Context(),
-		`insert into members (id, display_name, role, created_at)
-		 values ($1, $2, 'member', now())`,
-		memberID, displayName,
-	); err != nil {
-		writeError(w, http.StatusInternalServerError, "member_create_failed")
+	result, statusCode, errorCode := a.createMemberConnection(r.Context(), displayName, colorHex, goal, "member")
+	if errorCode != "" {
+		writeError(w, statusCode, errorCode)
 		return
 	}
 
-	if _, err := tx.Exec(
-		r.Context(),
-		`insert into connections (id, member_id, goal, color_hex, mcp_token, active, created_at, revoked_at)
-		 values ($1, $2, $3, $4, $5, true, now(), null)`,
-		uuid.New(), memberID, goal, colorHex, token,
-	); err != nil {
-		if isUniqueViolation(err) {
-			writeError(w, http.StatusConflict, "color_taken_or_duplicate_connection")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "connection_create_failed")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		writeError(w, http.StatusInternalServerError, "db_commit_failed")
-		return
-	}
-
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusCreated, issueTokenResponse{
-		MemberID:    memberID.String(),
-		DisplayName: displayName,
-		ColorHex:    colorHex,
-		MCPToken:    token,
+		MemberID:    result.MemberID,
+		DisplayName: result.DisplayName,
+		ColorHex:    result.ColorHex,
+		MCPToken:    result.MCPToken,
 	})
 }
 
@@ -822,6 +759,51 @@ func randomColorHex() string {
 		return "#3b82f6"
 	}
 	return fmt.Sprintf("#%02x%02x%02x", raw[0], raw[1], raw[2])
+}
+
+func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex, goal, role string) (createUserResponse, int, string) {
+	memberID := uuid.New()
+	token := uuid.NewString()
+
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "db_begin_failed"
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(
+		ctx,
+		`insert into members (id, display_name, role, created_at)
+		 values ($1, $2, $3, now())`,
+		memberID, displayName, role,
+	); err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "member_create_failed"
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`insert into connections (id, member_id, goal, color_hex, mcp_token, active, created_at, revoked_at)
+		 values ($1, $2, $3, $4, $5, true, now(), null)`,
+		uuid.New(), memberID, goal, colorHex, token,
+	); err != nil {
+		if isUniqueViolation(err) {
+			return createUserResponse{}, http.StatusConflict, "color_taken_or_duplicate_connection"
+		}
+		return createUserResponse{}, http.StatusInternalServerError, "connection_create_failed"
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "db_commit_failed"
+	}
+
+	return createUserResponse{
+		MemberID:     memberID.String(),
+		DisplayName:  displayName,
+		ColorHex:     colorHex,
+		Role:         role,
+		MCPToken:     token,
+		MCPServerURL: os.Getenv("MCP_SERVER_URL"),
+	}, 0, ""
 }
 
 func parseDateRange(fromRaw, toRaw string) (time.Time, time.Time, bool) {

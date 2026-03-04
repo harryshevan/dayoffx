@@ -169,6 +169,21 @@ select {
   font-size: 0.95rem;
 }
 
+.weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.weekday-label {
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 2px 0;
+}
+
 .day-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -206,6 +221,11 @@ select {
   width: 8px;
   height: 8px;
   border-radius: 999px;
+}
+
+.vac-dot-pending {
+  border: 1px solid var(--vac-dot-color);
+  background: linear-gradient(to right, var(--vac-dot-color) 50%, transparent 50%);
 }
 
 .vac-more {

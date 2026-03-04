@@ -17,6 +17,8 @@ const MONTH_NAMES = [
   "December"
 ];
 
+const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 type YearCalendarProps = {
   year: number;
   vacations: Vacation[];
@@ -31,6 +33,13 @@ export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalen
         return (
           <article key={monthName} className="month">
             <h3>{monthName}</h3>
+            <div className="weekday-grid" aria-hidden="true">
+              {WEEKDAY_NAMES.map((weekday) => (
+                <div key={weekday} className="weekday-label">
+                  {weekday}
+                </div>
+              ))}
+            </div>
             <div className="day-grid">
               {days.map((day) => {
                 return (
@@ -42,7 +51,7 @@ export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalen
                     title={day.vacationNames ? day.vacationNames.join(", ") : undefined}
                   >
                     {day.day}
-                    <VacationDots colors={day.vacationColors} />
+                    <VacationDots dots={day.vacationDots} />
                   </div>
                 );
               })}

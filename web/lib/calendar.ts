@@ -1,10 +1,15 @@
 import { Vacation } from "./types";
 
+export type VacationDot = {
+  colorHex: string;
+  status: Vacation["status"];
+};
+
 export type DayCell = {
   day: number;
   date: Date;
   inCurrentMonth: boolean;
-  vacationColors?: string[];
+  vacationDots?: VacationDot[];
   vacationNames?: string[];
   vacationMemberIds?: string[];
 };
@@ -34,7 +39,10 @@ export function buildMonthGrid(year: number, monthIndex: number, vacations: Vaca
       day: date.getUTCDate(),
       date,
       inCurrentMonth: date.getUTCMonth() === monthIndex,
-      vacationColors: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.colorHex) : undefined,
+      vacationDots:
+        vacationsForDay.length > 0
+          ? vacationsForDay.map((item) => ({ colorHex: item.colorHex, status: item.status }))
+          : undefined,
       vacationNames: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.displayName) : undefined,
       vacationMemberIds: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.memberId) : undefined
     };

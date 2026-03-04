@@ -13,11 +13,14 @@ export default function CalendarPage() {
   const currentYear = getCurrentYear();
   const [year, setYear] = useState(currentYear);
   const [vacations, setVacations] = useState<Vacation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const legendRef = useRef<HTMLElement | null>(null);
+  const requestIdRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
 
   const yearOptions = useMemo(
     () => Array.from({ length: 5 }, (_, index) => currentYear - 2 + index),
@@ -25,30 +28,37 @@ export default function CalendarPage() {
   );
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    const isFirstLoad = !hasLoadedOnceRef.current;
+
+    if (isFirstLoad) {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
 
     getVacations(year)
       .then((data) => {
-        if (!cancelled) {
+        if (requestIdRef.current === requestId) {
           setVacations(data);
+          hasLoadedOnceRef.current = true;
         }
       })
       .catch((requestError) => {
-        if (!cancelled) {
+        if (requestIdRef.current === requestId) {
           setError(requestError instanceof Error ? requestError.message : "Failed to load vacations");
         }
       })
       .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
+        if (requestIdRef.current === requestId) {
+          if (isFirstLoad) {
+            setIsInitialLoading(false);
+          }
+          setIsRefreshing(false);
         }
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [year]);
 
   const legendByMember = Array.from(
@@ -60,6 +70,7 @@ export default function CalendarPage() {
     }, new Map()).values()
   );
   const highlightedMemberId = selectedMemberId ?? hoveredMemberId;
+  const isBusy = isInitialLoading || isRefreshing;
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -99,8 +110,21 @@ export default function CalendarPage() {
 
   return (
     <main className="grid">
-      {legendByMember.length > 0 ? (
-        <section ref={legendRef} className="legend">
+      <section className="calendar-controls">
+        <label className="calendar-year-select">
+          Year{" "}
+          <select value={year} onChange={(event) => setYear(Number(event.target.value))} aria-busy={isBusy}>
+            {yearOptions.map((optionYear) => (
+              <option key={optionYear} value={optionYear}>
+                {optionYear}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      {!isInitialLoading ? (
+        <section ref={legendRef} className={`legend ${legendByMember.length === 0 ? "legend-empty" : ""}`}>
           {legendByMember.map((item) => (
             <button
               key={item.memberId}
@@ -120,36 +144,36 @@ export default function CalendarPage() {
       ) : null}
 
       {error ? <section className="card">Error: {error}</section> : null}
-      {loading ? (
-        <section className="calendar-skeleton" aria-label="Loading calendar" aria-busy="true">
-          {Array.from({ length: 6 }, (_, monthIndex) => (
-            <div key={monthIndex} className="skeleton-month">
-              <div className="skeleton-title" />
-              <div className="skeleton-grid">
-                {Array.from({ length: 35 }, (_, dayIndex) => (
-                  <div key={dayIndex} className="skeleton-cell" />
-                ))}
+      <section className="calendar-stage" aria-busy={isBusy}>
+        {isInitialLoading ? (
+          <section className="calendar-skeleton" aria-label="Loading calendar">
+            {Array.from({ length: 12 }, (_, monthIndex) => (
+              <div key={monthIndex} className="skeleton-month">
+                <div className="skeleton-title" />
+                <div className="skeleton-weekday-grid" aria-hidden="true">
+                  {Array.from({ length: 7 }, (_, weekdayIndex) => (
+                    <div key={weekdayIndex} className="skeleton-weekday" />
+                  ))}
+                </div>
+                <div className="skeleton-grid">
+                  {Array.from({ length: 42 }, (_, dayIndex) => (
+                    <div key={dayIndex} className="skeleton-cell" />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
-      ) : null}
-      {!loading && !error ? (
-        <>
-          <section className="calendar-controls">
-            <label className="calendar-year-select">
-              Year{" "}
-              <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
-                {yearOptions.map((optionYear) => (
-                  <option key={optionYear} value={optionYear}>
-                    {optionYear}
-                  </option>
-                ))}
-              </select>
-            </label>
+            ))}
           </section>
+        ) : (
           <YearCalendar year={year} vacations={vacations} highlightedMemberId={highlightedMemberId} />
-        </>
+        )}
+        {isRefreshing ? (
+          <div className="calendar-refresh-overlay" role="status" aria-live="polite">
+            <span className="calendar-refresh-chip">Loading {year}...</span>
+          </div>
+        ) : null}
+      </section>
+      {!isInitialLoading && !error && vacations.length === 0 ? (
+        <section className="card">No vacations found for {year}.</section>
       ) : null}
     </main>
   );

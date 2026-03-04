@@ -194,6 +194,11 @@ select {
   justify-self: end;
 }
 
+.calendar-stage {
+  position: relative;
+  min-height: 780px;
+}
+
 .month {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -314,6 +319,10 @@ select {
   box-shadow: 0 10px 24px -22px rgba(15, 23, 42, 0.9);
 }
 
+.legend-empty {
+  min-height: 44px;
+}
+
 @supports not ((-webkit-backdrop-filter: blur(4px)) or (backdrop-filter: blur(4px))) {
   .legend {
     background: var(--bg);
@@ -393,22 +402,58 @@ select {
   margin-bottom: 0.45rem;
 }
 
+.skeleton-weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.skeleton-weekday {
+  height: 12px;
+  border-radius: 4px;
+}
+
 .skeleton-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
+  gap: 2px;
 }
 
 .skeleton-cell {
-  height: 24px;
-  border-radius: 5px;
+  min-height: 28px;
+  border-radius: 6px;
 }
 
 .skeleton-title,
+.skeleton-weekday,
 .skeleton-cell {
   background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-mid) 50%, var(--skeleton-base) 75%);
   background-size: 240% 100%;
   animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.calendar-refresh-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 32%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0.6rem;
+}
+
+.calendar-refresh-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 @keyframes skeleton-shimmer {
@@ -426,6 +471,7 @@ select {
   .day,
   .legend-item,
   .skeleton-title,
+  .skeleton-weekday,
   .skeleton-cell {
     transition-duration: 1ms !important;
     animation: none !important;
@@ -444,6 +490,10 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .calendar-stage {
+    min-height: 1180px;
+  }
+
   .year-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -456,6 +506,10 @@ select {
 @media (max-width: 640px) {
   .calendar-controls {
     grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .calendar-stage {
+    min-height: 2200px;
   }
 
   .year-grid {

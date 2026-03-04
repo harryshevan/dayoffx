@@ -19,9 +19,10 @@ const MONTH_NAMES = [
 type YearCalendarProps = {
   year: number;
   vacations: Vacation[];
+  highlightedMemberId?: string | null;
 };
 
-export function YearCalendar({ year, vacations }: YearCalendarProps) {
+export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalendarProps) {
   return (
     <section className="year-grid">
       {MONTH_NAMES.map((monthName, monthIndex) => {
@@ -33,7 +34,9 @@ export function YearCalendar({ year, vacations }: YearCalendarProps) {
               {days.map((day) => (
                 <div
                   key={day.date.toISOString()}
-                  className={`day ${day.inCurrentMonth ? "" : "day-muted"}`}
+                  className={`day ${day.inCurrentMonth ? "" : "day-muted"} ${
+                    highlightedMemberId && day.vacationMemberId === highlightedMemberId ? "day-highlighted" : ""
+                  }`}
                   title={day.vacationName ? `${day.vacationName}` : undefined}
                 >
                   {day.day}

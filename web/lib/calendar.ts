@@ -6,6 +6,7 @@ export type DayCell = {
   inCurrentMonth: boolean;
   vacationColor?: string;
   vacationName?: string;
+  vacationMemberId?: string;
 };
 
 const WEEK_START_MONDAY = 1;
@@ -34,7 +35,8 @@ export function buildMonthGrid(year: number, monthIndex: number, vacations: Vaca
       date,
       inCurrentMonth: date.getUTCMonth() === monthIndex,
       vacationColor: vacation?.colorHex,
-      vacationName: vacation?.displayName
+      vacationName: vacation?.displayName,
+      vacationMemberId: vacation?.memberId
     };
   });
 }

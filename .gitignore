@@ -11,3 +11,4 @@ tmp
 *.log
 .pnpm-store
 *.tsbuildinfo
+supabase/.temp

@@ -12,7 +12,7 @@ export default function HomePage() {
           <Link href="/onboard" className="btn btn-primary" style={{ textDecoration: "none" }}>
             Start onboarding
           </Link>
-          <Link href="/calendar" className="btn" style={{ textDecoration: "none", border: "1px solid #d1d5db" }}>
+          <Link href="/calendar" className="btn" style={{ textDecoration: "none" }}>
             Open calendar
           </Link>
         </div>

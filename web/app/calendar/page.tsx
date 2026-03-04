@@ -79,6 +79,24 @@ export default function CalendarPage() {
     };
   }, [selectedMemberId]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (!selectedMemberId && !hoveredMemberId) {
+        return;
+      }
+      setSelectedMemberId(null);
+      setHoveredMemberId(null);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedMemberId, hoveredMemberId]);
+
   return (
     <main className="grid">
       {legendByMember.length > 0 ? (
@@ -92,6 +110,7 @@ export default function CalendarPage() {
               onMouseLeave={() => setHoveredMemberId(null)}
               onClick={() => setSelectedMemberId((previous) => (previous === item.memberId ? null : item.memberId))}
               aria-pressed={selectedMemberId === item.memberId}
+              aria-label={`${item.name}: ${selectedMemberId === item.memberId ? "disable" : "enable"} filter`}
             >
               <span className="dot" style={{ background: item.color }} />
               {item.name}
@@ -101,7 +120,20 @@ export default function CalendarPage() {
       ) : null}
 
       {error ? <section className="card">Error: {error}</section> : null}
-      {loading ? <section className="card">Loading calendar...</section> : null}
+      {loading ? (
+        <section className="calendar-skeleton" aria-label="Loading calendar" aria-busy="true">
+          {Array.from({ length: 6 }, (_, monthIndex) => (
+            <div key={monthIndex} className="skeleton-month">
+              <div className="skeleton-title" />
+              <div className="skeleton-grid">
+                {Array.from({ length: 35 }, (_, dayIndex) => (
+                  <div key={dayIndex} className="skeleton-cell" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
       {!loading && !error ? (
         <>
           <section className="calendar-controls">

@@ -26,6 +26,11 @@ type YearCalendarProps = {
 };
 
 export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalendarProps) {
+  const today = new Date();
+  const todayYear = today.getUTCFullYear();
+  const todayMonth = today.getUTCMonth();
+  const todayDay = today.getUTCDate();
+
   return (
     <section className="year-grid">
       {MONTH_NAMES.map((monthName, monthIndex) => {
@@ -42,12 +47,18 @@ export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalen
             </div>
             <div className="day-grid">
               {days.map((day) => {
+                const isToday =
+                  day.inCurrentMonth &&
+                  day.date.getUTCFullYear() === todayYear &&
+                  day.date.getUTCMonth() === todayMonth &&
+                  day.date.getUTCDate() === todayDay;
+
                 return (
                   <div
                     key={day.date.toISOString()}
                     className={`day ${day.inCurrentMonth ? "" : "day-muted"} ${
                       highlightedMemberId && day.vacationMemberIds?.includes(highlightedMemberId) ? "day-highlighted" : ""
-                    }`}
+                    } ${isToday ? "day-today" : ""}`}
                     title={day.vacationNames ? day.vacationNames.join(", ") : undefined}
                   >
                     {day.day}

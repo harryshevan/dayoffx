@@ -10,6 +10,11 @@
   --accent: #2563eb;
   --highlight-ring: #111827;
   --highlight-bg: #e0f2fe;
+  --skeleton-base: #eef2f8;
+  --skeleton-mid: #ffffff;
+  --dur-fast: 140ms;
+  --dur-normal: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   color: var(--text);
   background: var(--bg);
   color-scheme: light;
@@ -26,6 +31,8 @@ html[data-theme="dark"] {
   --accent: #3b82f6;
   --highlight-ring: #e5e7eb;
   --highlight-bg: #12253f;
+  --skeleton-base: #172336;
+  --skeleton-mid: #21314a;
   color-scheme: dark;
 }
 
@@ -84,6 +91,25 @@ select {
   padding: 0.6rem 1rem;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.btn:hover {
+  background: var(--surface-soft);
+  border-color: var(--highlight-ring);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .btn-primary {
@@ -173,6 +199,16 @@ select {
   border-radius: 12px;
   background: var(--surface);
   padding: 0.6rem;
+  transition:
+    border-color var(--dur-normal) var(--ease-standard),
+    box-shadow var(--dur-normal) var(--ease-standard),
+    transform var(--dur-normal) var(--ease-standard);
+}
+
+.month:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 6px 16px -12px rgba(17, 24, 39, 0.45);
+  transform: translateY(-1px);
 }
 
 .month h3 {
@@ -204,15 +240,30 @@ select {
 .day {
   min-height: 28px;
   border-radius: 6px;
+  border: 1px solid transparent;
   font-size: 0.72rem;
   padding: 2px 4px;
   background: var(--surface-soft);
   position: relative;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.day:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.day:active {
+  transform: scale(0.98);
 }
 
 .day-highlighted {
   box-shadow: inset 0 0 0 2px var(--highlight-ring);
-  background: var(--highlight-bg);
+  background: color-mix(in srgb, var(--highlight-bg) 82%, var(--surface));
 }
 
 .day-muted {
@@ -252,6 +303,21 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 24px -22px rgba(15, 23, 42, 0.9);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(4px)) or (backdrop-filter: blur(4px))) {
+  .legend {
+    background: var(--bg);
+  }
 }
 
 .legend-item {
@@ -264,6 +330,24 @@ select {
   padding: 0.25rem 0.6rem;
   font-size: 0.8rem;
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+.legend-item:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.legend-item:active {
+  transform: translateY(1px);
+}
+
+.legend-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .legend-item-active {
@@ -271,10 +355,88 @@ select {
   background: var(--surface-soft);
 }
 
+.day-today {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--surface-soft) 72%, var(--surface));
+}
+
+.day.day-today.day-highlighted {
+  box-shadow:
+    inset 0 0 0 2px var(--highlight-ring),
+    inset 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--highlight-bg) 70%, var(--surface));
+}
+
 .dot {
   width: 9px;
   height: 9px;
   border-radius: 999px;
+}
+
+.calendar-skeleton {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.skeleton-month {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.6rem;
+  background: var(--surface);
+}
+
+.skeleton-title {
+  height: 14px;
+  width: 42%;
+  border-radius: 6px;
+  margin-bottom: 0.45rem;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.skeleton-cell {
+  height: 24px;
+  border-radius: 5px;
+}
+
+.skeleton-title,
+.skeleton-cell {
+  background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-mid) 50%, var(--skeleton-base) 75%);
+  background-size: 240% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .month,
+  .day,
+  .legend-item,
+  .skeleton-title,
+  .skeleton-cell {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+
+  .btn:active,
+  .month:hover,
+  .day:active,
+  .legend-item:active {
+    transform: none !important;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -285,6 +447,10 @@ select {
   .year-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .calendar-skeleton {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -293,6 +459,10 @@ select {
   }
 
   .year-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .calendar-skeleton {
     grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }

@@ -21,7 +21,7 @@ export default function OnboardPage() {
           This page shows the connection format only. Real credentials are issued by an admin through MCP tool
           <code> createUser</code>.
         </p>
-        <div className="card" style={{ background: "#f8fafc" }}>
+        <div className="card" style={{ background: "var(--surface-soft)", borderColor: "var(--border-strong)" }}>
           <strong>Important</strong>
           <div style={{ marginTop: "0.35rem" }}>
             The token below is fictional and will never work in production: <code>{EXAMPLE_TOKEN}</code>

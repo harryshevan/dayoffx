@@ -22,10 +22,10 @@ const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 type YearCalendarProps = {
   year: number;
   vacations: Vacation[];
-  highlightedMemberId?: string | null;
+  highlightedMemberIds?: string[];
 };
 
-export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalendarProps) {
+export function YearCalendar({ year, vacations, highlightedMemberIds = [] }: YearCalendarProps) {
   const today = new Date();
   const todayYear = today.getUTCFullYear();
   const todayMonth = today.getUTCMonth();
@@ -57,7 +57,10 @@ export function YearCalendar({ year, vacations, highlightedMemberId }: YearCalen
                   <div
                     key={day.date.toISOString()}
                     className={`day ${day.inCurrentMonth ? "" : "day-muted"} ${
-                      highlightedMemberId && day.vacationMemberIds?.includes(highlightedMemberId) ? "day-highlighted" : ""
+                      highlightedMemberIds.length > 0 &&
+                      day.vacationMemberIds?.some((memberId) => highlightedMemberIds.includes(memberId))
+                        ? "day-highlighted"
+                        : ""
                     } ${isToday ? "day-today" : ""}`}
                     title={day.vacationNames ? day.vacationNames.join(", ") : undefined}
                   >

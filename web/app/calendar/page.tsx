@@ -17,7 +17,7 @@ export default function CalendarPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const legendRef = useRef<HTMLElement | null>(null);
   const requestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
@@ -69,18 +69,19 @@ export default function CalendarPage() {
       return acc;
     }, new Map()).values()
   );
-  const highlightedMemberId = selectedMemberId ?? hoveredMemberId;
+  const highlightedMemberIds =
+    selectedMemberIds.length > 0 ? selectedMemberIds : hoveredMemberId ? [hoveredMemberId] : [];
   const isBusy = isInitialLoading || isRefreshing;
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
-      if (!selectedMemberId) {
+      if (selectedMemberIds.length === 0) {
         return;
       }
       if (legendRef.current?.contains(event.target as Node)) {
         return;
       }
-      setSelectedMemberId(null);
+      setSelectedMemberIds([]);
       setHoveredMemberId(null);
     };
 
@@ -88,17 +89,17 @@ export default function CalendarPage() {
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [selectedMemberId]);
+  }, [selectedMemberIds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") {
         return;
       }
-      if (!selectedMemberId && !hoveredMemberId) {
+      if (selectedMemberIds.length === 0 && !hoveredMemberId) {
         return;
       }
-      setSelectedMemberId(null);
+      setSelectedMemberIds([]);
       setHoveredMemberId(null);
     };
 
@@ -106,7 +107,7 @@ export default function CalendarPage() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedMemberId, hoveredMemberId]);
+  }, [selectedMemberIds, hoveredMemberId]);
 
   return (
     <main className="grid">
@@ -129,12 +130,24 @@ export default function CalendarPage() {
             <button
               key={item.memberId}
               type="button"
-              className={`legend-item ${highlightedMemberId === item.memberId ? "legend-item-active" : ""}`}
-              onMouseEnter={() => setHoveredMemberId(item.memberId)}
+              className={`legend-item ${selectedMemberIds.includes(item.memberId) ? "legend-item-active" : ""}`}
+              onMouseEnter={() => {
+                if (selectedMemberIds.length === 0) {
+                  setHoveredMemberId(item.memberId);
+                }
+              }}
               onMouseLeave={() => setHoveredMemberId(null)}
-              onClick={() => setSelectedMemberId((previous) => (previous === item.memberId ? null : item.memberId))}
-              aria-pressed={selectedMemberId === item.memberId}
-              aria-label={`${item.name}: ${selectedMemberId === item.memberId ? "disable" : "enable"} filter`}
+              onClick={() =>
+                setSelectedMemberIds((previous) =>
+                  previous.includes(item.memberId)
+                    ? previous.filter((memberId) => memberId !== item.memberId)
+                    : [...previous, item.memberId]
+                )
+              }
+              aria-pressed={selectedMemberIds.includes(item.memberId)}
+              aria-label={`${item.name}: ${
+                selectedMemberIds.includes(item.memberId) ? "remove from filter" : "add to filter"
+              }`}
             >
               <span className="dot" style={{ background: item.color }} />
               {item.name}
@@ -164,7 +177,7 @@ export default function CalendarPage() {
             ))}
           </section>
         ) : (
-          <YearCalendar year={year} vacations={vacations} highlightedMemberId={highlightedMemberId} />
+          <YearCalendar year={year} vacations={vacations} highlightedMemberIds={highlightedMemberIds} />
         )}
         {isRefreshing ? (
           <div className="calendar-refresh-overlay" role="status" aria-live="polite">

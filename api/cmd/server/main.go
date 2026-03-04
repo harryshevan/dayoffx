@@ -252,7 +252,7 @@ func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := a.db.Query(
 		r.Context(),
-		`select v.id, v.member_id, m.display_name, c.color_hex, v.from_date, v.to_date, v.reason, v.status
+		`select v.id, v.member_id, m.display_name, m.color_hex, v.from_date, v.to_date, v.reason, v.status
 		 from vacations v
 		 join members m on m.id = v.member_id
 		 join connections c on c.member_id = m.id and c.active = true
@@ -323,7 +323,7 @@ func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) h
 			var storedHash *string
 			err := a.db.QueryRow(
 				r.Context(),
-				`select m.id, c.id, m.role, m.display_name, c.color_hex, c.token_hash
+				`select m.id, c.id, m.role, m.display_name, m.color_hex, c.token_hash
 				 from connections c
 				 join members m on m.id = c.member_id
 				 where c.token_id = $1 and c.active = true`,
@@ -348,7 +348,7 @@ func (a *app) auth(next func(http.ResponseWriter, *http.Request, authContext)) h
 			}
 			err := a.db.QueryRow(
 				r.Context(),
-				`select m.id, c.id, m.role, m.display_name, c.color_hex
+				`select m.id, c.id, m.role, m.display_name, m.color_hex
 				 from connections c
 				 join members m on m.id = c.member_id
 				 where c.mcp_token = $1 and c.active = true`,
@@ -411,13 +411,9 @@ func (a *app) syncProfileFromHeaders(w http.ResponseWriter, r *http.Request, aut
 		if nextColor != auth.CurrentColor {
 			if _, err := tx.Exec(
 				r.Context(),
-				`update connections set color_hex = $1 where id = $2 and active = true`,
-				nextColor, auth.ConnectionID,
+				`update members set color_hex = $1 where id = $2`,
+				nextColor, auth.MemberID,
 			); err != nil {
-				if isUniqueViolation(err) {
-					writeError(w, http.StatusConflict, "color_taken")
-					return false
-				}
 				writeError(w, http.StatusInternalServerError, "profile_color_update_failed")
 				return false
 			}
@@ -586,19 +582,15 @@ func (a *app) changeColor(w http.ResponseWriter, r *http.Request, auth authConte
 
 	commandTag, err := a.db.Exec(
 		r.Context(),
-		`update connections set color_hex = $1 where id = $2 and active = true`,
-		newColor, auth.ConnectionID,
+		`update members set color_hex = $1 where id = $2`,
+		newColor, auth.MemberID,
 	)
 	if err != nil {
-		if isUniqueViolation(err) {
-			writeError(w, http.StatusConflict, "color_taken")
-			return
-		}
 		writeError(w, http.StatusInternalServerError, "profile_color_update_failed")
 		return
 	}
 	if commandTag.RowsAffected() == 0 {
-		writeError(w, http.StatusNotFound, "connection_not_found")
+		writeError(w, http.StatusNotFound, "member_not_found")
 		return
 	}
 
@@ -921,21 +913,21 @@ func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex,
 
 	if _, err := tx.Exec(
 		ctx,
-		`insert into members (id, display_name, role, created_at)
-		 values ($1, $2, $3, now())`,
-		memberID, displayName, role,
+		`insert into members (id, display_name, color_hex, role, created_at)
+		 values ($1, $2, $3, $4, now())`,
+		memberID, displayName, colorHex, role,
 	); err != nil {
 		return createUserResponse{}, http.StatusInternalServerError, "member_create_failed"
 	}
 
 	if _, err := tx.Exec(
 		ctx,
-		`insert into connections (id, member_id, goal, color_hex, mcp_token, token_id, token_hash, token_version, active, created_at, revoked_at)
-		 values ($1, $2, $3, $4, null, $5, $6, $7, true, now(), null)`,
-		uuid.New(), memberID, goal, colorHex, tokenID, tokenHash, tokenVersion,
+		`insert into connections (id, member_id, goal, mcp_token, token_id, token_hash, token_version, active, created_at, revoked_at)
+		 values ($1, $2, $3, null, $4, $5, $6, true, now(), null)`,
+		uuid.New(), memberID, goal, tokenID, tokenHash, tokenVersion,
 	); err != nil {
 		if isUniqueViolation(err) {
-			return createUserResponse{}, http.StatusConflict, "color_taken_or_duplicate_connection"
+			return createUserResponse{}, http.StatusConflict, "duplicate_connection_or_token"
 		}
 		return createUserResponse{}, http.StatusInternalServerError, "connection_create_failed"
 	}

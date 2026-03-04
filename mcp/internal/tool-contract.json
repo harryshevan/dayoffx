@@ -1,0 +1,44 @@
+{
+  "name": "dayoffs-mcp-tools",
+  "version": "1.0.0",
+  "authentication": {
+    "type": "token",
+    "field": "token",
+    "notes": "Use member token from /v1/connect response."
+  },
+  "tools": [
+    {
+      "name": "createVacation",
+      "arguments": {
+        "from": "YYYY-MM-DD",
+        "to": "YYYY-MM-DD",
+        "reason": "string"
+      },
+      "behavior": "Creates pending vacation for token owner."
+    },
+    {
+      "name": "changeVacation",
+      "arguments": {
+        "vacationId": "uuid",
+        "newFrom": "YYYY-MM-DD",
+        "newTo": "YYYY-MM-DD",
+        "newReason": "string"
+      },
+      "behavior": "Changes token owner's vacation and resets status to pending."
+    },
+    {
+      "name": "removeVacation",
+      "arguments": {
+        "vacationId": "uuid"
+      },
+      "behavior": "Removes token owner's vacation."
+    },
+    {
+      "name": "approveVacation",
+      "arguments": {
+        "vacationId": "uuid"
+      },
+      "behavior": "Admin-only. Approves vacation and writes audit record."
+    }
+  ]
+}

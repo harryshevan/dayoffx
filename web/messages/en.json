@@ -1,6 +1,6 @@
 {
   "common": {
-    "switchLanguageTo": "Switch language to {locale}"
+    "switchLanguageTo": "Switch to {locale}"
   },
   "layout": {
     "brand": "Team Dayoffs",
@@ -13,10 +13,10 @@
   },
   "home": {
     "title": "Team vacation plans",
-    "description": "Connect to your team's MCP and manage vacations from your favorite GPT interface.",
+    "description": "Connect your team's MCP and manage vacations from your favorite GPT interface.",
     "openCalendar": "Open calendar",
     "onboardingHint": {
-      "before": "Need a quick guide? Open onboarding with the ",
+      "before": "Need a quick guide? Open onboarding from the ",
       "after": " button in the bottom-left corner."
     }
   },
@@ -66,27 +66,27 @@
     "gotIt": "Got it",
     "steps": {
       "preview": {
-        "title": "Calendar is view-only",
-        "description": "The web calendar is view-only. Vacation requests are sent via MCP",
+        "title": "View-only calendar",
+        "description": "The web calendar is view-only. Send vacation requests via MCP",
         "monthLabel": "March 2026",
         "badge": "Preview"
       },
       "statuses": {
-        "title": "Two request statuses",
-        "description": "A pending request is shown as a half-circle. An approved request is shown as a full circle",
+        "title": "Two request states",
+        "description": "Pending requests are shown as a half-circle. Approved requests are shown as a full circle",
         "pending": "Pending",
         "approved": "Approved"
       },
       "admins": {
-        "title": "Admins approve requests",
+        "title": "Admins review requests",
         "description": "Only admins can approve vacation requests. You can change your profile name and color via MCP",
         "badge": "MCP config"
       },
       "mcp": {
-        "title": "How to connect MCP?",
+        "title": "How do I connect MCP?",
         "description": "Copy the JSON config below and add it to your MCP client settings.",
         "tokenLink": {
-          "before": "To get your personal token, open",
+          "before": "To get a personal token, open",
           "anchor": "Telegram bot",
           "after": "and request access."
         },

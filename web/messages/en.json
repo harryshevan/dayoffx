@@ -67,24 +67,24 @@
     "steps": {
       "preview": {
         "title": "Calendar is preview only",
-        "description": "Web calendar is read-only preview. Requests are managed via MCP (and later via Telegram bot).",
+        "description": "Web calendar is read-only preview. Requests are managed via MCP (and later via Telegram bot)",
         "monthLabel": "March 2026",
         "badge": "Preview"
       },
       "statuses": {
         "title": "Two request statuses",
-        "description": "Pending request is a half-circle dot. Approved request is a filled circle dot.",
+        "description": "Pending request is a half-circle dot. Approved request is a filled circle dot",
         "pending": "Pending",
         "approved": "Approved"
       },
       "admins": {
         "title": "Admins approve requests",
-        "description": "Admins review and approve requests. Your profile name and color can be changed via MCP config.",
+        "description": "Admins review and approve requests. Your profile name and color can be changed via MCP config",
         "badge": "MCP config"
       },
       "mcp": {
         "title": "How to connect MCP?",
-        "description": "Copy the JSON config below and add it to your MCP client settings.",
+        "description": "Copy the JSON config below and add it to your MCP client settings",
         "tokenLink": {
           "before": "To get your personal token, open the",
           "anchor": "Telegram bot",

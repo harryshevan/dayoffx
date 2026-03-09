@@ -832,6 +832,38 @@ select {
   border: 1px solid var(--border);
 }
 
+.onb-json-preview {
+  color: #e2e8f0;
+}
+
+.onb-json-focus {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.onb-rb-0 {
+  color: #fca5a5;
+}
+
+.onb-rb-1 {
+  color: #fdba74;
+}
+
+.onb-rb-2 {
+  color: #fde047;
+}
+
+.onb-rb-3 {
+  color: #86efac;
+}
+
+.onb-rb-4 {
+  color: #93c5fd;
+}
+
+.onb-rb-5 {
+  color: #c4b5fd;
+}
+
 .site-credit {
   position: fixed;
   right: 1rem;

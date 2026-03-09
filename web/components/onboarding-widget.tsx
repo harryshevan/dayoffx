@@ -37,6 +37,63 @@ export function OnboardingWidget() {
 }`,
     [mcpUrl]
   );
+  const cursorConfigPreview = useMemo(() => {
+    const focusAnchor = '"dayoff-mcp": {';
+    const focusStart = cursorConfigExample.indexOf(focusAnchor);
+    let focusEnd = -1;
+
+    if (focusStart !== -1) {
+      const openBraceIdx = cursorConfigExample.indexOf("{", focusStart);
+      if (openBraceIdx !== -1) {
+        let depth = 1;
+        for (let idx = openBraceIdx + 1; idx < cursorConfigExample.length; idx += 1) {
+          const char = cursorConfigExample[idx];
+          if (char === "{") {
+            depth += 1;
+          } else if (char === "}") {
+            depth -= 1;
+            if (depth === 0) {
+              focusEnd = idx + 1;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    const preview: React.ReactNode[] = [];
+    let bracketDepth = 0;
+
+    for (let idx = 0; idx < cursorConfigExample.length; idx += 1) {
+      const char = cursorConfigExample[idx];
+      const classes: string[] = [];
+      const isFocused = focusStart !== -1 && focusEnd !== -1 && idx >= focusStart && idx < focusEnd;
+
+      if (isFocused) {
+        classes.push("onb-json-focus");
+      }
+
+      if (char === "}" || char === "]") {
+        bracketDepth = Math.max(0, bracketDepth - 1);
+        classes.push(`onb-rb-${bracketDepth % 6}`);
+      } else if (char === "{" || char === "[") {
+        classes.push(`onb-rb-${bracketDepth % 6}`);
+        bracketDepth += 1;
+      }
+
+      if (classes.length > 0) {
+        preview.push(
+          <span key={idx} className={classes.join(" ")}>
+            {char}
+          </span>
+        );
+      } else {
+        preview.push(char);
+      }
+    }
+
+    return preview;
+  }, [cursorConfigExample]);
   const steps: Step[] = [
     {
       title: t("steps.preview.title"),
@@ -134,6 +191,7 @@ export function OnboardingWidget() {
               {isMcpCopied ? t("steps.mcp.copied") : t("steps.mcp.copy")}
             </button>
             <pre
+              className="onb-json-preview"
               style={{
                 margin: 0,
                 paddingRight: "6.8rem",
@@ -144,7 +202,7 @@ export function OnboardingWidget() {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"
               }}
             >
-              {cursorConfigExample}
+              {cursorConfigPreview}
             </pre>
           </div>
         </div>

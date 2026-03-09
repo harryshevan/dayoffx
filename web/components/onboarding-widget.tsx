@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 const EXAMPLE_TOKEN = "dayoff_example_token_do_not_use";
 const ONBOARDING_SEEN_KEY = "dayoffs-onboarding-seen-v1";
+const ONBOARDING_QUERY_PARAM = "onboarding";
 
 type Step = {
   title: string;
@@ -186,13 +187,15 @@ export function OnboardingWidget() {
 
   useEffect(() => {
     try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const forceOpenFromUrl = searchParams.get(ONBOARDING_QUERY_PARAM) === "1";
       const hasSeenOnboarding = window.localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
-      if (!hasSeenOnboarding) {
+      if (forceOpenFromUrl || !hasSeenOnboarding) {
         open();
         window.localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
       }
     } catch {
-      // Ignore storage access issues (e.g. private mode restrictions).
+      open();
     }
   }, []);
 

@@ -82,7 +82,6 @@ type telegramBaseResponse struct {
 
 const (
 	callbackIssueToken = "issue_token"
-	callbackShowFAQ    = "show_faq"
 	supportContact     = "@xigax"
 )
 
@@ -184,8 +183,6 @@ func (a *app) handleCallbackQuery(ctx context.Context, callback telegramCallback
 	switch strings.TrimSpace(callback.Data) {
 	case callbackIssueToken:
 		a.handleIssueTokenCallback(ctx, chatID, callback.From)
-	case callbackShowFAQ:
-		_ = a.sendTelegramMessage(ctx, chatID, textFAQ)
 	}
 }
 

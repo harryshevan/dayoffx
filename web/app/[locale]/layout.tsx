@@ -23,7 +23,6 @@ function TopBar() {
       <div className="topbar-actions">
         <nav className="topnav">
           <Link href="/calendar">{t("calendar")}</Link>
-          <Link href="/onboard">{t("onboard")}</Link>
         </nav>
         <ThemeToggle />
       </div>

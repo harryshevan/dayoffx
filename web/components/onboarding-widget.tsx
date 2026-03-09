@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
+const EXAMPLE_TOKEN = "dayoff_example_token_do_not_use";
+
 type Step = {
   title: string;
   description: string;
@@ -14,7 +16,24 @@ export function OnboardingWidget() {
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
+  const [isMcpCopied, setIsMcpCopied] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mcpCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const botUrl = process.env.NEXT_PUBLIC_BOT_URL?.trim();
+  const mcpUrl = process.env.NEXT_PUBLIC_MCP_URL?.trim() || "https://your-dayoff-host.example.com/mcp";
+  const cursorConfigExample = useMemo(
+    () => `{
+  "mcpServers": {
+    "dayoff-mcp": {
+      "url": "${mcpUrl}",
+      "headers": {
+        "Authorization": "Bearer ${EXAMPLE_TOKEN}"
+      }
+    }
+  }
+}`,
+    [mcpUrl]
+  );
   const steps: Step[] = [
     {
       title: t("steps.preview.title"),
@@ -60,6 +79,73 @@ export function OnboardingWidget() {
           <span className="onb-mini-badge">{t("steps.admins.badge")}</span>
         </div>
       )
+    },
+    {
+      title: t("steps.mcp.title"),
+      description: t("steps.mcp.description"),
+      visual: (
+        <div style={{ display: "grid", gap: "0.7rem" }}>
+          {botUrl ? (
+            <p style={{ margin: 0, fontSize: "0.84rem", lineHeight: 1.35 }}>
+              {t("steps.mcp.tokenLink.before")}{" "}
+              <a href={botUrl} target="_blank" rel="noopener noreferrer">
+                {t("steps.mcp.tokenLink.anchor")}
+              </a>{" "}
+              {t("steps.mcp.tokenLink.after")}
+            </p>
+          ) : null}
+
+          <div
+            style={{
+              position: "relative",
+              background: "#0f172a",
+              color: "#e2e8f0",
+              border: "1px solid #1e293b",
+              borderRadius: 10,
+              padding: "0.65rem"
+            }}
+          >
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(cursorConfigExample);
+                  setIsMcpCopied(true);
+                  if (mcpCopyTimerRef.current) {
+                    clearTimeout(mcpCopyTimerRef.current);
+                  }
+                  mcpCopyTimerRef.current = setTimeout(() => setIsMcpCopied(false), 1500);
+                } catch {
+                  setIsMcpCopied(false);
+                }
+              }}
+              style={{
+                position: "absolute",
+                top: "0.4rem",
+                right: "0.4rem",
+                padding: "0.3rem 0.55rem",
+                fontSize: "0.76rem"
+              }}
+            >
+              {isMcpCopied ? t("steps.mcp.copied") : t("steps.mcp.copy")}
+            </button>
+            <pre
+              style={{
+                margin: 0,
+                paddingRight: "6.8rem",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontSize: "0.74rem",
+                lineHeight: 1.38,
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"
+              }}
+            >
+              {cursorConfigExample}
+            </pre>
+          </div>
+        </div>
+      )
     }
   ];
 
@@ -72,6 +158,9 @@ export function OnboardingWidget() {
     return () => {
       if (closeTimerRef.current) {
         clearTimeout(closeTimerRef.current);
+      }
+      if (mcpCopyTimerRef.current) {
+        clearTimeout(mcpCopyTimerRef.current);
       }
     };
   }, []);

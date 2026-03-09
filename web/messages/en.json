@@ -4,8 +4,7 @@
   },
   "layout": {
     "brand": "Team Dayoffs",
-    "calendar": "Calendar",
-    "onboard": "Onboarding"
+    "calendar": "Calendar"
   },
   "theme": {
     "toggleDarkMode": "Toggle dark mode",
@@ -82,29 +81,18 @@
         "title": "Admins approve requests",
         "description": "Admins review and approve requests. Your profile name and color can be changed via MCP config.",
         "badge": "MCP config"
+      },
+      "mcp": {
+        "title": "How to connect MCP?",
+        "description": "Copy the JSON config below and add it to your MCP client settings.",
+        "tokenLink": {
+          "before": "To get your personal token, open the",
+          "anchor": "Telegram bot",
+          "after": "and request access."
+        },
+        "copy": "Copy",
+        "copied": "Copied"
       }
     }
-  },
-  "onboard": {
-    "title": "How to connect",
-    "intro": {
-      "beforeCode": "This page shows the connection format only. Real credentials are issued by an admin through MCP tool",
-      "afterCode": "."
-    },
-    "important": {
-      "title": "Important",
-      "text": "The token below is fictional and will never work in production:"
-    },
-    "stepsTitle": "How to connect",
-    "steps": {
-      "step1": {
-        "beforeCode": "Ask an admin to create your user with MCP tool ",
-        "afterCode": "."
-      },
-      "step2": "Receive your personal MCP token from the admin.",
-      "step3": "Open Cursor MCP settings and paste config similar to the example below.",
-      "step4": "Replace both URL and token with real values from your admin."
-    },
-    "configTitle": "Cursor mcp.json example"
   }
 }

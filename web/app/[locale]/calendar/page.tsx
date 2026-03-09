@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { getVacations } from "@/lib/api";
 import { Vacation } from "@/lib/types";
 import { YearCalendar } from "@/components/year-calendar";
@@ -10,6 +11,7 @@ function getCurrentYear(): number {
 }
 
 export default function CalendarPage() {
+  const t = useTranslations("calendar");
   const currentYear = getCurrentYear();
   const [year, setYear] = useState(currentYear);
   const [vacations, setVacations] = useState<Vacation[]>([]);
@@ -48,7 +50,7 @@ export default function CalendarPage() {
       })
       .catch((requestError) => {
         if (requestIdRef.current === requestId) {
-          setError(requestError instanceof Error ? requestError.message : "Failed to load vacations");
+          setError(requestError instanceof Error ? requestError.message : t("failedToLoadVacations"));
         }
       })
       .finally(() => {
@@ -59,7 +61,7 @@ export default function CalendarPage() {
           setIsRefreshing(false);
         }
       });
-  }, [year]);
+  }, [year, t]);
 
   const legendByMember = Array.from(
     vacations.reduce<Map<string, { memberId: string; name: string; color: string }>>((acc, item) => {
@@ -113,7 +115,7 @@ export default function CalendarPage() {
     <main className="grid">
       <section className="calendar-controls">
         <label className="calendar-year-select">
-          Year{" "}
+          {t("year")}{" "}
           <select value={year} onChange={(event) => setYear(Number(event.target.value))} aria-busy={isBusy}>
             {yearOptions.map((optionYear) => (
               <option key={optionYear} value={optionYear}>
@@ -145,9 +147,10 @@ export default function CalendarPage() {
                 )
               }
               aria-pressed={selectedMemberIds.includes(item.memberId)}
-              aria-label={`${item.name}: ${
-                selectedMemberIds.includes(item.memberId) ? "remove from filter" : "add to filter"
-              }`}
+              aria-label={t(
+                selectedMemberIds.includes(item.memberId) ? "legendRemoveFromFilter" : "legendAddToFilter",
+                { name: item.name }
+              )}
             >
               <span className="dot" style={{ background: item.color }} />
               {item.name}
@@ -156,10 +159,10 @@ export default function CalendarPage() {
         </section>
       ) : null}
 
-      {error ? <section className="card">Error: {error}</section> : null}
+      {error ? <section className="card">{t("error")}: {error}</section> : null}
       <section className="calendar-stage" aria-busy={isBusy}>
         {isInitialLoading ? (
-          <section className="calendar-skeleton" aria-label="Loading calendar">
+          <section className="calendar-skeleton" aria-label={t("loadingCalendar")}>
             {Array.from({ length: 12 }, (_, monthIndex) => (
               <div key={monthIndex} className="skeleton-month">
                 <div className="skeleton-title" />
@@ -181,12 +184,12 @@ export default function CalendarPage() {
         )}
         {isRefreshing ? (
           <div className="calendar-refresh-overlay" role="status" aria-live="polite">
-            <span className="calendar-refresh-chip">Loading {year}...</span>
+            <span className="calendar-refresh-chip">{t("loadingYear", { year })}</span>
           </div>
         ) : null}
       </section>
       {!isInitialLoading && !error && vacations.length === 0 ? (
-        <section className="card">No vacations found for {year}.</section>
+        <section className="card">{t("noVacationsForYear", { year })}</section>
       ) : null}
     </main>
   );

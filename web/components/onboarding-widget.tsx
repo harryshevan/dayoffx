@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type Step = {
   title: string;
@@ -8,59 +9,59 @@ type Step = {
   visual: React.ReactNode;
 };
 
-const steps: Step[] = [
-  {
-    title: "Calendar is preview only",
-    description: "Web calendar is read-only preview. Requests are managed via MCP (and later via Telegram bot).",
-    visual: (
-      <div className="onb-mini-calendar" aria-hidden>
-        <div className="onb-mini-calendar-title">March 2026</div>
-        <div className="onb-mini-days">
-          {Array.from({ length: 14 }).map((_, idx) => (
-            <span key={idx} className="onb-mini-day" />
-          ))}
-        </div>
-        <span className="onb-mini-badge">Preview</span>
-      </div>
-    )
-  },
-  {
-    title: "Two request statuses",
-    description: "Pending request is a half-circle dot. Approved request is a filled circle dot.",
-    visual: (
-      <div className="onb-statuses" aria-hidden>
-        <div className="onb-status-chip">
-          <span className="onb-dot onb-dot-pending" />
-          Pending
-        </div>
-        <div className="onb-status-chip">
-          <span className="onb-dot onb-dot-approved" />
-          Approved
-        </div>
-      </div>
-    )
-  },
-  {
-    title: "Admins approve requests",
-    description: "Admins review and approve requests. Your profile name and color can be changed via MCP config.",
-    visual: (
-      <div className="onb-profile-card" aria-hidden>
-        <div className="onb-profile-avatar" />
-        <div className="onb-profile-lines">
-          <span />
-          <span />
-        </div>
-        <span className="onb-mini-badge">MCP config</span>
-      </div>
-    )
-  }
-];
-
 export function OnboardingWidget() {
+  const t = useTranslations("onboarding");
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const steps: Step[] = [
+    {
+      title: t("steps.preview.title"),
+      description: t("steps.preview.description"),
+      visual: (
+        <div className="onb-mini-calendar" aria-hidden>
+          <div className="onb-mini-calendar-title">{t("steps.preview.monthLabel")}</div>
+          <div className="onb-mini-days">
+            {Array.from({ length: 14 }).map((_, idx) => (
+              <span key={idx} className="onb-mini-day" />
+            ))}
+          </div>
+          <span className="onb-mini-badge">{t("steps.preview.badge")}</span>
+        </div>
+      )
+    },
+    {
+      title: t("steps.statuses.title"),
+      description: t("steps.statuses.description"),
+      visual: (
+        <div className="onb-statuses" aria-hidden>
+          <div className="onb-status-chip">
+            <span className="onb-dot onb-dot-pending" />
+            {t("steps.statuses.pending")}
+          </div>
+          <div className="onb-status-chip">
+            <span className="onb-dot onb-dot-approved" />
+            {t("steps.statuses.approved")}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: t("steps.admins.title"),
+      description: t("steps.admins.description"),
+      visual: (
+        <div className="onb-profile-card" aria-hidden>
+          <div className="onb-profile-avatar" />
+          <div className="onb-profile-lines">
+            <span />
+            <span />
+          </div>
+          <span className="onb-mini-badge">{t("steps.admins.badge")}</span>
+        </div>
+      )
+    }
+  ];
 
   const step = useMemo(() => steps[stepIndex], [stepIndex]);
   const isFirst = stepIndex === 0;
@@ -115,7 +116,7 @@ export function OnboardingWidget() {
         type="button"
         className="onb-help-trigger"
         onClick={open}
-        aria-label="Open onboarding"
+        aria-label={t("open")}
       >
         ?
       </button>
@@ -137,7 +138,7 @@ export function OnboardingWidget() {
                 {stepIndex + 1}/{steps.length}
               </span>
               <button type="button" className="btn" onClick={close}>
-                Close
+                {t("close")}
               </button>
             </div>
 
@@ -150,16 +151,16 @@ export function OnboardingWidget() {
 
             <div className="onb-actions">
               <button type="button" className="btn" disabled={isFirst} onClick={() => setStepIndex((v) => v - 1)}>
-                Back
+                {t("back")}
               </button>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 {!isLast ? (
                   <button type="button" className="btn btn-primary" onClick={() => setStepIndex((v) => v + 1)}>
-                    Next
+                    {t("next")}
                   </button>
                 ) : (
                   <button type="button" className="btn btn-primary" onClick={close}>
-                    Got it
+                    {t("gotIt")}
                   </button>
                 )}
               </div>

@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 const EXAMPLE_TOKEN = "dayoff_example_token_do_not_use";
 const EXAMPLE_MCP_URL = "https://your-dayoff-host.example.com/mcp";
 
@@ -13,34 +15,41 @@ const cursorConfigExample = `{
 }`;
 
 export default function OnboardPage() {
+  const t = useTranslations("onboard");
+
   return (
     <main className="grid" style={{ gap: "1rem" }}>
       <section className="card">
-        <h1 style={{ marginTop: 0, marginBottom: "0.5rem" }}>How to connect</h1>
+        <h1 style={{ marginTop: 0, marginBottom: "0.5rem" }}>{t("title")}</h1>
         <p style={{ marginTop: 0, marginBottom: "0.75rem" }}>
-          This page shows the connection format only. Real credentials are issued by an admin through MCP tool
-          <code> admin.user.create</code>.
+          {t("intro.beforeCode")}
+          <code> admin.user.create</code>
+          {t("intro.afterCode")}
         </p>
         <div className="card" style={{ background: "var(--surface-soft)", borderColor: "var(--border-strong)" }}>
-          <strong>Important</strong>
+          <strong>{t("important.title")}</strong>
           <div style={{ marginTop: "0.35rem" }}>
-            The token below is fictional and will never work in production: <code>{EXAMPLE_TOKEN}</code>
+            {t("important.text")} <code>{EXAMPLE_TOKEN}</code>
           </div>
         </div>
       </section>
 
       <section className="card">
-        <h2 style={{ marginTop: 0, marginBottom: "0.6rem" }}>How to connect</h2>
+        <h2 style={{ marginTop: 0, marginBottom: "0.6rem" }}>{t("stepsTitle")}</h2>
         <ol style={{ margin: 0, paddingInlineStart: "1.1rem", display: "grid", gap: "0.45rem" }}>
-          <li>Ask an admin to create your user with MCP tool <code>admin.user.create</code>.</li>
-          <li>Receive your personal MCP token from the admin.</li>
-          <li>Open Cursor MCP settings and paste config similar to the example below.</li>
-          <li>Replace both URL and token with real values from your admin.</li>
+          <li>
+            {t("steps.step1.beforeCode")}
+            <code>admin.user.create</code>
+            {t("steps.step1.afterCode")}
+          </li>
+          <li>{t("steps.step2")}</li>
+          <li>{t("steps.step3")}</li>
+          <li>{t("steps.step4")}</li>
         </ol>
       </section>
 
       <section className="card">
-        <h2 style={{ marginTop: 0, marginBottom: "0.6rem" }}>Cursor mcp.json example</h2>
+        <h2 style={{ marginTop: 0, marginBottom: "0.6rem" }}>{t("configTitle")}</h2>
         <textarea
           readOnly
           value={cursorConfigExample}

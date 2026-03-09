@@ -1,0 +1,110 @@
+{
+  "common": {
+    "switchLanguageTo": "Switch language to {locale}"
+  },
+  "layout": {
+    "brand": "Team Dayoffs",
+    "calendar": "Calendar",
+    "onboard": "Onboarding"
+  },
+  "theme": {
+    "toggleDarkMode": "Toggle dark mode",
+    "darkModeOn": "Dark mode on",
+    "darkModeOff": "Dark mode off"
+  },
+  "home": {
+    "title": "Team vacation plans",
+    "description": "Connect to team MCP, then manage vacations from your favorite GPT interface.",
+    "openCalendar": "Open calendar",
+    "onboardingHint": {
+      "before": "Need a quick guide? Open onboarding with the ",
+      "after": " button in the bottom-left corner."
+    }
+  },
+  "calendar": {
+    "year": "Year",
+    "failedToLoadVacations": "Failed to load vacations",
+    "legendAddToFilter": "{name}: add to filter",
+    "legendRemoveFromFilter": "{name}: remove from filter",
+    "error": "Error",
+    "loadingCalendar": "Loading calendar",
+    "loadingYear": "Loading {year}...",
+    "noVacationsForYear": "No vacations found for {year}."
+  },
+  "yearCalendar": {
+    "months": {
+      "1": "January",
+      "2": "February",
+      "3": "March",
+      "4": "April",
+      "5": "May",
+      "6": "June",
+      "7": "July",
+      "8": "August",
+      "9": "September",
+      "10": "October",
+      "11": "November",
+      "12": "December"
+    },
+    "weekdays": {
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat",
+      "7": "Sun"
+    },
+    "showVacationsForDay": "{day}: show vacations",
+    "vacationsForSelectedDay": "Vacations for selected day",
+    "rangeSeparator": "->"
+  },
+  "onboarding": {
+    "open": "Open onboarding",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "gotIt": "Got it",
+    "steps": {
+      "preview": {
+        "title": "Calendar is preview only",
+        "description": "Web calendar is read-only preview. Requests are managed via MCP (and later via Telegram bot).",
+        "monthLabel": "March 2026",
+        "badge": "Preview"
+      },
+      "statuses": {
+        "title": "Two request statuses",
+        "description": "Pending request is a half-circle dot. Approved request is a filled circle dot.",
+        "pending": "Pending",
+        "approved": "Approved"
+      },
+      "admins": {
+        "title": "Admins approve requests",
+        "description": "Admins review and approve requests. Your profile name and color can be changed via MCP config.",
+        "badge": "MCP config"
+      }
+    }
+  },
+  "onboard": {
+    "title": "How to connect",
+    "intro": {
+      "beforeCode": "This page shows the connection format only. Real credentials are issued by an admin through MCP tool",
+      "afterCode": "."
+    },
+    "important": {
+      "title": "Important",
+      "text": "The token below is fictional and will never work in production:"
+    },
+    "stepsTitle": "How to connect",
+    "steps": {
+      "step1": {
+        "beforeCode": "Ask an admin to create your user with MCP tool ",
+        "afterCode": "."
+      },
+      "step2": "Receive your personal MCP token from the admin.",
+      "step3": "Open Cursor MCP settings and paste config similar to the example below.",
+      "step4": "Replace both URL and token with real values from your admin."
+    },
+    "configTitle": "Cursor mcp.json example"
+  }
+}

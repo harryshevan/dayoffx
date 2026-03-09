@@ -16,10 +16,11 @@ import (
 )
 
 type app struct {
-	apiBaseURL string
-	botToken   string
-	botSecret  string
-	client     *http.Client
+	apiBaseURL  string
+	calendarURL string
+	botToken    string
+	botSecret   string
+	client      *http.Client
 }
 
 type telegramUpdate struct {
@@ -81,6 +82,7 @@ type telegramBaseResponse struct {
 
 const (
 	callbackIssueToken = "issue_token"
+	callbackShowFAQ    = "show_faq"
 	supportContact     = "@xigax"
 )
 
@@ -97,6 +99,7 @@ func main() {
 	if botSecret == "" {
 		log.Fatal("BOT_SECRET is required")
 	}
+	calendarURL := strings.TrimSpace(os.Getenv("OPEN_CALENDAR_REDIRECT_URL"))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -104,10 +107,11 @@ func main() {
 	}
 
 	application := &app{
-		apiBaseURL: apiBaseURL,
-		botToken:   botToken,
-		botSecret:  botSecret,
-		client:     &http.Client{Timeout: 35 * time.Second},
+		apiBaseURL:  apiBaseURL,
+		calendarURL: calendarURL,
+		botToken:    botToken,
+		botSecret:   botSecret,
+		client:      &http.Client{Timeout: 35 * time.Second},
 	}
 
 	ctx := context.Background()
@@ -148,24 +152,24 @@ func (a *app) handleMessage(ctx context.Context, message telegramMessage) {
 	statusCode, body, err := a.callAPIAccess(ctx, payload)
 	if err != nil {
 		log.Printf("access failed: %v", err)
-		_ = a.sendTelegramMessage(ctx, chatID, "Service is temporarily unavailable. Please try again later.")
+		_ = a.sendTelegramMessage(ctx, chatID, textServiceUnavailable)
 		return
 	}
 
 	switch {
 	case statusCode == http.StatusForbidden:
-		_ = a.sendTelegramMessage(ctx, chatID, "You are not on the allowlist yet. Please contact "+supportContact+".")
+		_ = a.sendTelegramMessage(ctx, chatID, textNotAllowlisted(supportContact))
 	case statusCode >= http.StatusBadRequest:
 		log.Printf("access error status=%d body=%s", statusCode, strings.TrimSpace(string(body)))
-		_ = a.sendTelegramMessage(ctx, chatID, "Could not check allowlist status. Please try again later.")
+		_ = a.sendTelegramMessage(ctx, chatID, textAllowlistCheckFail)
 	default:
 		var result accessSuccessResponse
 		if err := json.Unmarshal(body, &result); err != nil {
 			log.Printf("access parse failed: %v", err)
-			_ = a.sendTelegramMessage(ctx, chatID, "Allowlist check succeeded but response could not be parsed.")
+			_ = a.sendTelegramMessage(ctx, chatID, textAllowlistParseFail)
 			return
 		}
-		_ = a.sendTelegramMessageWithTokenButton(ctx, chatID, "You are on the allowlist!\n\nUse MCP to call calendar functions")
+		_ = a.sendTelegramMessageWithActionButtons(ctx, chatID, textAllowlisted)
 	}
 }
 
@@ -176,37 +180,42 @@ func (a *app) handleCallbackQuery(ctx context.Context, callback telegramCallback
 	if callback.Message == nil || callback.From == nil {
 		return
 	}
-	if strings.TrimSpace(callback.Data) != callbackIssueToken {
-		return
-	}
-
 	chatID := callback.Message.Chat.ID
-	payload := requestFromUser(callback.From)
+	switch strings.TrimSpace(callback.Data) {
+	case callbackIssueToken:
+		a.handleIssueTokenCallback(ctx, chatID, callback.From)
+	case callbackShowFAQ:
+		_ = a.sendTelegramMessage(ctx, chatID, textFAQ)
+	}
+}
+
+func (a *app) handleIssueTokenCallback(ctx context.Context, chatID int64, user *telegramUser) {
+	payload := requestFromUser(user)
 	statusCode, body, err := a.callAPIExchange(ctx, payload)
 	if err != nil {
 		log.Printf("exchange failed: %v", err)
-		_ = a.sendTelegramMessage(ctx, chatID, "Service is temporarily unavailable. Please try again later.")
+		_ = a.sendTelegramMessage(ctx, chatID, textServiceUnavailable)
 		return
 	}
 
 	switch {
 	case statusCode == http.StatusForbidden:
-		_ = a.sendTelegramMessage(ctx, chatID, "You are not on the allowlist yet. Please contact "+supportContact+".")
+		_ = a.sendTelegramMessage(ctx, chatID, textNotAllowlisted(supportContact))
 	case statusCode >= http.StatusBadRequest:
 		log.Printf("exchange error status=%d body=%s", statusCode, strings.TrimSpace(string(body)))
-		_ = a.sendTelegramMessage(ctx, chatID, "Could not issue a token. Please try again later.")
+		_ = a.sendTelegramMessage(ctx, chatID, textIssueTokenFail)
 	default:
 		var result exchangeSuccessResponse
 		if err := json.Unmarshal(body, &result); err != nil {
 			log.Printf("exchange parse failed: %v", err)
-			_ = a.sendTelegramMessage(ctx, chatID, "Token was issued but response could not be parsed.")
+			_ = a.sendTelegramMessage(ctx, chatID, textTokenParseFail)
 			return
 		}
 		if strings.TrimSpace(result.MCPToken) == "" {
-			_ = a.sendTelegramMessage(ctx, chatID, "Token response is empty. Please contact support.")
+			_ = a.sendTelegramMessage(ctx, chatID, textTokenEmpty)
 			return
 		}
-		_ = a.sendTelegramMessage(ctx, chatID, "Here is your new MCP token:\n`"+result.MCPToken+"`")
+		_ = a.sendTelegramMessage(ctx, chatID, textTokenIssued(result.MCPToken))
 	}
 }
 
@@ -317,16 +326,26 @@ func (a *app) sendTelegramMessage(ctx context.Context, chatID int64, text string
 	return nil
 }
 
-func (a *app) sendTelegramMessageWithTokenButton(ctx context.Context, chatID int64, text string) error {
+func (a *app) sendTelegramMessageWithActionButtons(ctx context.Context, chatID int64, text string) error {
+	buttonRows := [][]map[string]string{
+		{
+			{"text": buttonGetToken, "callback_data": callbackIssueToken},
+		},
+	}
+	if strings.TrimSpace(a.calendarURL) != "" {
+		buttonRows = append(buttonRows, []map[string]string{
+			{"text": buttonOpenCalendar, "url": a.calendarURL},
+		})
+	}
+	buttonRows = append(buttonRows, []map[string]string{
+		{"text": buttonFAQ, "callback_data": callbackShowFAQ},
+	})
+
 	payload := map[string]any{
 		"chat_id": strconv.FormatInt(chatID, 10),
 		"text":    text,
 		"reply_markup": map[string]any{
-			"inline_keyboard": [][]map[string]string{
-				{
-					{"text": "Get a new MCP token", "callback_data": callbackIssueToken},
-				},
-			},
+			"inline_keyboard": buttonRows,
 		},
 	}
 	_, err := a.callTelegram(ctx, "sendMessage", payload)

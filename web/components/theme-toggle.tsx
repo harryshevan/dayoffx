@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type Theme = "light" | "dark";
 
@@ -12,6 +13,7 @@ function getInitialTheme(): Theme {
 }
 
 export function ThemeToggle() {
+  const t = useTranslations("theme");
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
@@ -36,8 +38,8 @@ export function ThemeToggle() {
       onClick={handleClick}
       role="switch"
       aria-checked={isDark}
-      aria-label="Toggle dark mode"
-      title={isDark ? "Dark mode on" : "Dark mode off"}
+      aria-label={t("toggleDarkMode")}
+      title={isDark ? t("darkModeOn") : t("darkModeOff")}
     >
       <span className="theme-switch-track" aria-hidden="true">
         <span className="theme-switch-thumb" />

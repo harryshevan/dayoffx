@@ -32,6 +32,7 @@ type telegramUpdate struct {
 type telegramMessage struct {
 	Chat telegramChat  `json:"chat"`
 	From *telegramUser `json:"from"`
+	Text string        `json:"text"`
 }
 
 type telegramChat struct {

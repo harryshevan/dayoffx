@@ -520,3 +520,185 @@ select {
     grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }
+
+.onb-help-trigger {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 30;
+  box-shadow: 0 10px 22px -16px rgba(15, 23, 42, 0.85);
+}
+
+.onb-help-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.onb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.onb-modal {
+  width: min(480px, 100%);
+  padding: 1rem;
+}
+
+.onb-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.onb-progress {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.onb-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.08rem;
+}
+
+.onb-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.onb-visual-wrap {
+  margin-top: 0.85rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  padding: 0.8rem;
+}
+
+.onb-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.onb-mini-calendar {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0.55rem;
+}
+
+.onb-mini-calendar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+
+.onb-mini-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.onb-mini-day {
+  height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-soft) 70%, var(--surface));
+  border: 1px solid var(--border);
+}
+
+.onb-mini-badge {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  font-size: 0.64rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  background: var(--surface-soft);
+}
+
+.onb-statuses {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.onb-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  background: var(--surface);
+  font-size: 0.84rem;
+}
+
+.onb-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.onb-dot-pending {
+  border: 1px solid #0f766e;
+  background: linear-gradient(to right, #0f766e 50%, transparent 50%);
+}
+
+.onb-dot-approved {
+  background: #0f766e;
+}
+
+.onb-profile-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0.6rem;
+}
+
+.onb-profile-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  flex-shrink: 0;
+}
+
+.onb-profile-lines {
+  width: 100%;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.onb-profile-lines span {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-soft) 75%, var(--surface));
+  border: 1px solid var(--border);
+}

@@ -2,6 +2,7 @@ import "./globals.css";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { OnboardingWidget } from "@/components/onboarding-widget";
 
 const themeInitScript = `
 (() => {
@@ -28,14 +29,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </Link>
             <div className="topbar-actions">
               <nav className="topnav">
-              <Link href="/calendar">Calendar</Link>
-              <Link href="/onboard">Onboard</Link>
+                <Link href="/calendar">Calendar</Link>
               </nav>
               <ThemeToggle />
             </div>
           </header>
           {children}
         </div>
+        <OnboardingWidget />
       </body>
     </html>
   );

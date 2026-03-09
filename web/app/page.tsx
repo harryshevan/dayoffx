@@ -9,13 +9,13 @@ export default function HomePage() {
           Connect to team MCP, then manage vacations from your favorite GPT interface.
         </p>
         <div style={{ display: "flex", gap: "0.75rem" }}>
-          <Link href="/onboard" className="btn btn-primary" style={{ textDecoration: "none" }}>
-            Start onboarding
-          </Link>
-          <Link href="/calendar" className="btn" style={{ textDecoration: "none" }}>
+          <Link href="/calendar" className="btn btn-primary" style={{ textDecoration: "none" }}>
             Open calendar
           </Link>
         </div>
+        <p style={{ marginBottom: 0, color: "var(--muted)" }}>
+          Need a quick guide? Open onboarding with the <strong>?</strong> button in the bottom-left corner.
+        </p>
       </section>
     </main>
   );

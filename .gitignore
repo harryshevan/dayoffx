@@ -17,3 +17,4 @@ supabase/.temp
 .gopath
 api/server
 mcp/server
+bot/server

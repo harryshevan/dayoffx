@@ -27,6 +27,7 @@ import (
 type app struct {
 	db                  *pgxpool.Pool
 	adminSecret         string
+	botSecret           string
 	tokenPepper         string
 	legacyTokenFallback bool
 }
@@ -90,6 +91,43 @@ type issueTokenResponse struct {
 	MCPToken    string `json:"mcpToken"`
 }
 
+type privateTelegramWhitelistRequest struct {
+	TelegramUsername string `json:"telegramUsername"`
+}
+
+type privateTelegramWhitelistResponse struct {
+	TelegramUsername string `json:"telegramUsername"`
+}
+
+type privateTelegramExchangeRequest struct {
+	TelegramID       int64  `json:"telegramId"`
+	TelegramUsername string `json:"telegramUsername"`
+	FirstName        string `json:"firstName"`
+	LastName         string `json:"lastName"`
+}
+
+type privateTelegramAccessResponse struct {
+	Allowed          bool   `json:"allowed"`
+	TelegramUsername string `json:"telegramUsername"`
+}
+
+type privateTelegramExchangeResponse struct {
+	MemberID         string `json:"memberId"`
+	DisplayName      string `json:"displayName"`
+	ColorHex         string `json:"colorHex"`
+	MCPToken         string `json:"mcpToken"`
+	MCPServerURL     string `json:"mcpServerUrl"`
+	WasCreated       bool   `json:"wasCreated"`
+	TelegramUsername string `json:"telegramUsername"`
+}
+
+type telegramWhitelistRecord struct {
+	ID               uuid.UUID
+	MemberID         *uuid.UUID
+	TelegramID       *int64
+	TelegramUsername string
+}
+
 type revokeTokenRequest struct {
 	Token string `json:"token"`
 }
@@ -99,6 +137,8 @@ var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 const (
 	memberTokenPrefix = "dof"
 	memberTokenV1     = "v1"
+	defaultGoal       = "other"
+	defaultRole       = "member"
 )
 
 func main() {
@@ -118,6 +158,7 @@ func main() {
 	handler := &app{
 		db:                  db,
 		adminSecret:         os.Getenv("ADMIN_SECRET"),
+		botSecret:           strings.TrimSpace(os.Getenv("BOT_SECRET")),
 		tokenPepper:         strings.TrimSpace(os.Getenv("TOKEN_PEPPER")),
 		legacyTokenFallback: true,
 	}
@@ -142,6 +183,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", handler.healthz)
 	mux.HandleFunc("/v1/private/users", handler.auth(handler.createPrivateUser))
+	mux.HandleFunc("/v1/private/telegram/whitelist", handler.privateTelegramWhitelist)
+	mux.HandleFunc("/v1/private/telegram/access", handler.privateTelegramAccess)
+	mux.HandleFunc("/v1/private/telegram/exchange", handler.privateTelegramExchange)
 	mux.HandleFunc("/v1/vacations", handler.listVacations)
 	mux.HandleFunc("/v1/mcp/createVacation", handler.auth(handler.createVacation))
 	mux.HandleFunc("/v1/mcp/changeVacation", handler.auth(handler.changeVacation))
@@ -212,7 +256,7 @@ func (a *app) createPrivateUser(w http.ResponseWriter, r *http.Request, auth aut
 
 	goal := strings.TrimSpace(req.Goal)
 	if goal == "" {
-		goal = "other"
+		goal = defaultGoal
 	}
 
 	colorHex := strings.ToLower(strings.TrimSpace(req.ColorHex))
@@ -224,7 +268,7 @@ func (a *app) createPrivateUser(w http.ResponseWriter, r *http.Request, auth aut
 		return
 	}
 
-	result, statusCode, errorCode := a.createMemberConnection(r.Context(), displayName, colorHex, goal, "member")
+	result, statusCode, errorCode := a.createMemberConnection(r.Context(), displayName, colorHex, goal, defaultRole)
 	if errorCode != "" {
 		writeError(w, statusCode, errorCode)
 		return
@@ -232,6 +276,122 @@ func (a *app) createPrivateUser(w http.ResponseWriter, r *http.Request, auth aut
 
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusCreated, result)
+}
+
+func (a *app) privateTelegramWhitelist(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !a.isEnvAdminRequest(r) {
+		writeError(w, http.StatusForbidden, "env_admin_only")
+		return
+	}
+
+	var req privateTelegramWhitelistRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	telegramUsername := normalizeTelegramUsername(req.TelegramUsername)
+	if telegramUsername == "" {
+		writeError(w, http.StatusBadRequest, "telegram_username_required")
+		return
+	}
+
+	result, statusCode, errorCode := a.upsertTelegramWhitelist(r.Context(), telegramUsername)
+	if errorCode != "" {
+		writeError(w, statusCode, errorCode)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (a *app) privateTelegramExchange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !a.isBotOrEnvAdminRequest(r) {
+		writeError(w, http.StatusUnauthorized, "bot_or_env_admin_required")
+		return
+	}
+
+	var req privateTelegramExchangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	result, statusCode, errorCode := a.exchangeTelegramForToken(r.Context(), req)
+	if errorCode != "" {
+		writeError(w, statusCode, errorCode)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (a *app) privateTelegramAccess(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !a.isBotOrEnvAdminRequest(r) {
+		writeError(w, http.StatusUnauthorized, "bot_or_env_admin_required")
+		return
+	}
+
+	var req privateTelegramExchangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	result, statusCode, errorCode := a.checkTelegramAccess(r.Context(), req)
+	if errorCode != "" {
+		writeError(w, statusCode, errorCode)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (a *app) isEnvAdminRequest(r *http.Request) bool {
+	if a.adminSecret == "" {
+		return false
+	}
+	token := extractRequestToken(r)
+	return token != "" && token == a.adminSecret
+}
+
+func (a *app) isBotOrEnvAdminRequest(r *http.Request) bool {
+	if a.isEnvAdminRequest(r) {
+		return true
+	}
+	if a.botSecret == "" {
+		return false
+	}
+	botSecret := strings.TrimSpace(r.Header.Get("X-Bot-Secret"))
+	if botSecret == "" {
+		return false
+	}
+	return hmac.Equal([]byte(botSecret), []byte(a.botSecret))
+}
+
+func extractRequestToken(r *http.Request) string {
+	token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	if token == "" {
+		token = strings.TrimSpace(r.Header.Get("X-MCP-Token"))
+	}
+	return token
+}
+
+func normalizeTelegramUsername(raw string) string {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	value = strings.TrimPrefix(value, "@")
+	return value
 }
 
 func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
@@ -715,7 +875,7 @@ func (a *app) issueToken(w http.ResponseWriter, r *http.Request, auth authContex
 
 	goal := strings.TrimSpace(req.Goal)
 	if goal == "" {
-		goal = "other"
+		goal = defaultGoal
 	}
 
 	colorHex := strings.ToLower(strings.TrimSpace(req.ColorHex))
@@ -727,7 +887,7 @@ func (a *app) issueToken(w http.ResponseWriter, r *http.Request, auth authContex
 		return
 	}
 
-	result, statusCode, errorCode := a.createMemberConnection(r.Context(), displayName, colorHex, goal, "member")
+	result, statusCode, errorCode := a.createMemberConnection(r.Context(), displayName, colorHex, goal, defaultRole)
 	if errorCode != "" {
 		writeError(w, statusCode, errorCode)
 		return
@@ -899,17 +1059,251 @@ func legacyMCPTokenColumnExists(ctx context.Context, db *pgxpool.Pool) (bool, er
 }
 
 func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex, goal, role string) (createUserResponse, int, string) {
-	memberID := uuid.New()
-	token, tokenID, tokenHash, tokenVersion, err := generateMemberToken(a.tokenPepper)
-	if err != nil {
-		return createUserResponse{}, http.StatusInternalServerError, "token_generation_failed"
-	}
-
 	tx, err := a.db.Begin(ctx)
 	if err != nil {
 		return createUserResponse{}, http.StatusInternalServerError, "db_begin_failed"
 	}
 	defer tx.Rollback(ctx)
+
+	result, statusCode, errorCode := a.createMemberConnectionInTx(ctx, tx, displayName, colorHex, goal, role)
+	if errorCode != "" {
+		return createUserResponse{}, statusCode, errorCode
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "db_commit_failed"
+	}
+
+	return result, 0, ""
+}
+
+func (a *app) upsertTelegramWhitelist(ctx context.Context, telegramUsername string) (privateTelegramWhitelistResponse, int, string) {
+	_, err := a.db.Exec(
+		ctx,
+		`insert into telegram_whitelist (id, telegram_username, created_at, updated_at)
+		 values ($1, $2, now(), now())
+		 on conflict (telegram_username)
+		 do update set
+		   updated_at = now()`,
+		uuid.New(), telegramUsername,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return privateTelegramWhitelistResponse{}, http.StatusConflict, "telegram_identity_conflict"
+		}
+		return privateTelegramWhitelistResponse{}, http.StatusInternalServerError, "telegram_whitelist_upsert_failed"
+	}
+
+	return privateTelegramWhitelistResponse{
+		TelegramUsername: telegramUsername,
+	}, 0, ""
+}
+
+func (a *app) exchangeTelegramForToken(ctx context.Context, req privateTelegramExchangeRequest) (privateTelegramExchangeResponse, int, string) {
+	if req.TelegramID <= 0 {
+		return privateTelegramExchangeResponse{}, http.StatusBadRequest, "telegram_id_required"
+	}
+
+	normalizedUsername := normalizeTelegramUsername(req.TelegramUsername)
+
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return privateTelegramExchangeResponse{}, http.StatusInternalServerError, "db_begin_failed"
+	}
+	defer tx.Rollback(ctx)
+
+	record, statusCode, errorCode := loadTelegramWhitelistRecord(ctx, tx, req.TelegramID, normalizedUsername)
+	if errorCode != "" {
+		return privateTelegramExchangeResponse{}, statusCode, errorCode
+	}
+
+	nextUsername := record.TelegramUsername
+	if normalizedUsername != "" {
+		nextUsername = normalizedUsername
+	}
+	if nextUsername == "" {
+		return privateTelegramExchangeResponse{}, http.StatusForbidden, "telegram_username_required"
+	}
+
+	if statusCode, errorCode := updateTelegramIdentityInTx(ctx, tx, record.ID, req.TelegramID, nextUsername, req.FirstName, req.LastName); errorCode != "" {
+		return privateTelegramExchangeResponse{}, statusCode, errorCode
+	}
+
+	if record.MemberID == nil {
+		displayName := nextUsername
+		if displayName == "" {
+			displayName = fmt.Sprintf("member-%s", randomSuffix(6))
+		}
+
+		goal := defaultGoal
+		colorHex := randomColorHex()
+		if !colorPattern.MatchString(colorHex) {
+			return privateTelegramExchangeResponse{}, http.StatusInternalServerError, "invalid_default_color"
+		}
+
+		memberResult, statusCode, errorCode := a.createMemberConnectionInTx(ctx, tx, displayName, colorHex, goal, defaultRole)
+		if errorCode != "" {
+			return privateTelegramExchangeResponse{}, statusCode, errorCode
+		}
+
+		memberUUID, err := uuid.Parse(memberResult.MemberID)
+		if err != nil {
+			return privateTelegramExchangeResponse{}, http.StatusInternalServerError, "member_id_parse_failed"
+		}
+		if _, err := tx.Exec(
+			ctx,
+			`update telegram_whitelist set member_id = $1, updated_at = now() where id = $2`,
+			memberUUID, record.ID,
+		); err != nil {
+			return privateTelegramExchangeResponse{}, http.StatusInternalServerError, "telegram_whitelist_link_failed"
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return privateTelegramExchangeResponse{}, http.StatusInternalServerError, "db_commit_failed"
+		}
+		return privateTelegramExchangeResponse{
+			MemberID:         memberResult.MemberID,
+			DisplayName:      memberResult.DisplayName,
+			ColorHex:         memberResult.ColorHex,
+			MCPToken:         memberResult.MCPToken,
+			MCPServerURL:     memberResult.MCPServerURL,
+			WasCreated:       true,
+			TelegramUsername: nextUsername,
+		}, 0, ""
+	}
+
+	memberResult, statusCode, errorCode := a.rotateMemberTokenInTx(ctx, tx, *record.MemberID, defaultGoal)
+	if errorCode != "" {
+		return privateTelegramExchangeResponse{}, statusCode, errorCode
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return privateTelegramExchangeResponse{}, http.StatusInternalServerError, "db_commit_failed"
+	}
+	return privateTelegramExchangeResponse{
+		MemberID:         memberResult.MemberID,
+		DisplayName:      memberResult.DisplayName,
+		ColorHex:         memberResult.ColorHex,
+		MCPToken:         memberResult.MCPToken,
+		MCPServerURL:     memberResult.MCPServerURL,
+		WasCreated:       false,
+		TelegramUsername: nextUsername,
+	}, 0, ""
+}
+
+func (a *app) checkTelegramAccess(ctx context.Context, req privateTelegramExchangeRequest) (privateTelegramAccessResponse, int, string) {
+	if req.TelegramID <= 0 {
+		return privateTelegramAccessResponse{}, http.StatusBadRequest, "telegram_id_required"
+	}
+
+	normalizedUsername := normalizeTelegramUsername(req.TelegramUsername)
+
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return privateTelegramAccessResponse{}, http.StatusInternalServerError, "db_begin_failed"
+	}
+	defer tx.Rollback(ctx)
+
+	record, statusCode, errorCode := loadTelegramWhitelistRecord(ctx, tx, req.TelegramID, normalizedUsername)
+	if errorCode != "" {
+		return privateTelegramAccessResponse{}, statusCode, errorCode
+	}
+
+	nextUsername := record.TelegramUsername
+	if normalizedUsername != "" {
+		nextUsername = normalizedUsername
+	}
+	if nextUsername == "" {
+		return privateTelegramAccessResponse{}, http.StatusForbidden, "telegram_username_required"
+	}
+
+	if statusCode, errorCode := updateTelegramIdentityInTx(ctx, tx, record.ID, req.TelegramID, nextUsername, req.FirstName, req.LastName); errorCode != "" {
+		return privateTelegramAccessResponse{}, statusCode, errorCode
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return privateTelegramAccessResponse{}, http.StatusInternalServerError, "db_commit_failed"
+	}
+
+	return privateTelegramAccessResponse{
+		Allowed:          true,
+		TelegramUsername: nextUsername,
+	}, 0, ""
+}
+
+func updateTelegramIdentityInTx(ctx context.Context, tx pgx.Tx, whitelistID uuid.UUID, telegramID int64, telegramUsername, firstName, lastName string) (int, string) {
+	if _, err := tx.Exec(
+		ctx,
+		`update telegram_whitelist
+		 set telegram_id = $1,
+		     telegram_username = $2,
+		     first_name = nullif($3, ''),
+		     last_name = nullif($4, ''),
+		     last_seen_at = now(),
+		     updated_at = now()
+		 where id = $5`,
+		telegramID,
+		telegramUsername,
+		strings.TrimSpace(firstName),
+		strings.TrimSpace(lastName),
+		whitelistID,
+	); err != nil {
+		if isUniqueViolation(err) {
+			return http.StatusConflict, "telegram_identity_conflict"
+		}
+		return http.StatusInternalServerError, "telegram_whitelist_update_failed"
+	}
+	return 0, ""
+}
+
+func loadTelegramWhitelistRecord(ctx context.Context, tx pgx.Tx, telegramID int64, normalizedUsername string) (telegramWhitelistRecord, int, string) {
+	var record telegramWhitelistRecord
+	err := tx.QueryRow(
+		ctx,
+		`select id, member_id, telegram_id, telegram_username
+		 from telegram_whitelist
+		 where telegram_id = $1`,
+		telegramID,
+	).Scan(
+		&record.ID,
+		&record.MemberID,
+		&record.TelegramID,
+		&record.TelegramUsername,
+	)
+	if err == nil {
+		return record, 0, ""
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return telegramWhitelistRecord{}, http.StatusInternalServerError, "telegram_whitelist_lookup_failed"
+	}
+	if normalizedUsername == "" {
+		return telegramWhitelistRecord{}, http.StatusForbidden, "not_whitelisted"
+	}
+
+	err = tx.QueryRow(
+		ctx,
+		`select id, member_id, telegram_id, telegram_username
+		 from telegram_whitelist
+		 where telegram_username = $1`,
+		normalizedUsername,
+	).Scan(
+		&record.ID,
+		&record.MemberID,
+		&record.TelegramID,
+		&record.TelegramUsername,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return telegramWhitelistRecord{}, http.StatusForbidden, "not_whitelisted"
+		}
+		return telegramWhitelistRecord{}, http.StatusInternalServerError, "telegram_whitelist_lookup_failed"
+	}
+	return record, 0, ""
+}
+
+func (a *app) createMemberConnectionInTx(ctx context.Context, tx pgx.Tx, displayName, colorHex, goal, role string) (createUserResponse, int, string) {
+	memberID := uuid.New()
+	token, tokenID, tokenHash, tokenVersion, err := generateMemberToken(a.tokenPepper)
+	if err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "token_generation_failed"
+	}
 
 	if _, err := tx.Exec(
 		ctx,
@@ -922,8 +1316,8 @@ func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex,
 
 	if _, err := tx.Exec(
 		ctx,
-		`insert into connections (id, member_id, goal, mcp_token, token_id, token_hash, token_version, active, created_at, revoked_at)
-		 values ($1, $2, $3, null, $4, $5, $6, true, now(), null)`,
+		`insert into connections (id, member_id, goal, token_id, token_hash, token_version, active, created_at, revoked_at)
+		 values ($1, $2, $3, $4, $5, $6, true, now(), null)`,
 		uuid.New(), memberID, goal, tokenID, tokenHash, tokenVersion,
 	); err != nil {
 		if isUniqueViolation(err) {
@@ -932,8 +1326,69 @@ func (a *app) createMemberConnection(ctx context.Context, displayName, colorHex,
 		return createUserResponse{}, http.StatusInternalServerError, "connection_create_failed"
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return createUserResponse{}, http.StatusInternalServerError, "db_commit_failed"
+	return createUserResponse{
+		MemberID:     memberID.String(),
+		DisplayName:  displayName,
+		ColorHex:     colorHex,
+		Role:         role,
+		MCPToken:     token,
+		MCPServerURL: os.Getenv("MCP_SERVER_URL"),
+	}, 0, ""
+}
+
+func (a *app) rotateMemberTokenInTx(ctx context.Context, tx pgx.Tx, memberID uuid.UUID, goal string) (createUserResponse, int, string) {
+	token, tokenID, tokenHash, tokenVersion, err := generateMemberToken(a.tokenPepper)
+	if err != nil {
+		return createUserResponse{}, http.StatusInternalServerError, "token_generation_failed"
+	}
+
+	commandTag, err := tx.Exec(
+		ctx,
+		`update connections
+		 set goal = $1,
+		     token_id = $2,
+		     token_hash = $3,
+		     token_version = $4,
+		     active = true,
+		     revoked_at = null,
+		     created_at = now()
+		 where member_id = $5`,
+		goal, tokenID, tokenHash, tokenVersion, memberID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return createUserResponse{}, http.StatusConflict, "duplicate_connection_or_token"
+		}
+		return createUserResponse{}, http.StatusInternalServerError, "connection_rotate_failed"
+	}
+	if commandTag.RowsAffected() == 0 {
+		if _, err := tx.Exec(
+			ctx,
+			`insert into connections (id, member_id, goal, token_id, token_hash, token_version, active, created_at, revoked_at)
+			 values ($1, $2, $3, $4, $5, $6, true, now(), null)`,
+			uuid.New(), memberID, goal, tokenID, tokenHash, tokenVersion,
+		); err != nil {
+			if isUniqueViolation(err) {
+				return createUserResponse{}, http.StatusConflict, "duplicate_connection_or_token"
+			}
+			return createUserResponse{}, http.StatusInternalServerError, "connection_create_failed"
+		}
+	}
+
+	var (
+		displayName string
+		colorHex    string
+		role        string
+	)
+	if err := tx.QueryRow(
+		ctx,
+		`select display_name, color_hex, role from members where id = $1`,
+		memberID,
+	).Scan(&displayName, &colorHex, &role); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return createUserResponse{}, http.StatusNotFound, "member_not_found"
+		}
+		return createUserResponse{}, http.StatusInternalServerError, "member_lookup_failed"
 	}
 
 	return createUserResponse{

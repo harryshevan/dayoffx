@@ -542,6 +542,8 @@ select {
   .month,
   .day,
   .legend-item,
+  .onb-overlay,
+  .onb-modal,
   .skeleton-title,
   .skeleton-weekday,
   .skeleton-cell {
@@ -619,16 +621,44 @@ select {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms var(--ease-standard);
 }
 
 .onb-modal {
   width: min(480px, 100%);
   padding: 1rem;
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
+  transition:
+    opacity 220ms var(--ease-standard),
+    transform 220ms var(--ease-standard);
+}
+
+.onb-overlay-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.onb-overlay-closed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.onb-modal-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.onb-modal-closed {
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
 }
 
 .onb-topline {

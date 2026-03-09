@@ -102,6 +102,14 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
+			"admin.telegram.whitelist",
+			mcp.WithDescription("Add or update Telegram whitelist entry, env-admin only"),
+			mcp.WithString("telegramUsername", mcp.Required(), mcp.Description("Telegram username without @")),
+		),
+		a.whitelistTelegramUser,
+	)
+	s.AddTool(
+		mcp.NewTool(
 			"vacation.create",
 			mcp.WithDescription("Create a vacation request"),
 			mcp.WithString("from", mcp.Required(), mcp.Description("Start date YYYY-MM-DD")),
@@ -221,6 +229,24 @@ func (a *app) createUser(ctx context.Context, req mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	statusCode, body, callErr := a.callAPIAsEnvAdmin(ctx, http.MethodPost, "/v1/private/users", url.Values{}, payload, nil)
+	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) whitelistTelegramUser(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if extractBearer(req.Header) != a.adminSecret {
+		return mcp.NewToolResultError("env_admin_only"), nil
+	}
+
+	telegramUsername, err := req.RequireString("telegramUsername")
+	if err != nil || strings.TrimSpace(telegramUsername) == "" {
+		return mcp.NewToolResultError("telegramUsername_required"), nil
+	}
+
+	payload := map[string]any{
+		"telegramUsername": telegramUsername,
+	}
+
+	statusCode, body, callErr := a.callAPIAsEnvAdmin(ctx, http.MethodPost, "/v1/private/telegram/whitelist", url.Values{}, payload, nil)
 	return apiResult(statusCode, body, callErr), nil
 }
 

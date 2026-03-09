@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Step = {
   title: string;
@@ -57,19 +57,57 @@ const steps: Step[] = [
 ];
 
 export function OnboardingWidget() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const step = useMemo(() => steps[stepIndex], [stepIndex]);
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === steps.length - 1;
+  const animationMs = 220;
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsVisible(false);
+        closeTimerRef.current = setTimeout(() => setIsMounted(false), animationMs);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMounted]);
 
   const open = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     setStepIndex(0);
-    setIsOpen(true);
+    setIsMounted(true);
+    requestAnimationFrame(() => setIsVisible(true));
   };
 
-  const close = () => setIsOpen(false);
+  const close = () => {
+    setIsVisible(false);
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = setTimeout(() => setIsMounted(false), animationMs);
+  };
 
   return (
     <>
@@ -82,9 +120,18 @@ export function OnboardingWidget() {
         ?
       </button>
 
-      {isOpen ? (
-        <div className="onb-overlay" role="dialog" aria-modal="true" aria-labelledby="onb-title">
-          <div className="onb-modal card">
+      {isMounted ? (
+        <div
+          className={`onb-overlay ${isVisible ? "onb-overlay-open" : "onb-overlay-closed"}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="onb-title"
+          onClick={close}
+        >
+          <div
+            className={`onb-modal card ${isVisible ? "onb-modal-open" : "onb-modal-closed"}`}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="onb-topline">
               <span className="onb-progress">
                 {stepIndex + 1}/{steps.length}

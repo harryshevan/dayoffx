@@ -18,6 +18,13 @@
       "behavior": "Env-admin only. Creates a member via private API and returns a new MCP token."
     },
     {
+      "name": "admin.telegram.whitelist",
+      "arguments": {
+        "telegramUsername": "string required"
+      },
+      "behavior": "Env-admin only. Adds or updates Telegram whitelist entry in private API."
+    },
+    {
       "name": "vacation.create",
       "arguments": {
         "from": "YYYY-MM-DD",

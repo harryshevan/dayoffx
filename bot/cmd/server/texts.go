@@ -3,24 +3,24 @@ package main
 import "fmt"
 
 const (
-	buttonGetToken     = "Get token"
-	buttonOpenCalendar = "Open calendar"
+	buttonGetToken     = "Получить токен"
+	buttonOpenCalendar = "Открыть календарь"
 	buttonFAQ          = "FAQ"
 
-	textAllowlisted        = "You are on the allowlist!\n\nUse MCP to call calendar functions."
-	textServiceUnavailable = "Service is temporarily unavailable. Please try again later."
-	textAllowlistCheckFail = "Could not check allowlist status. Please try again later."
-	textAllowlistParseFail = "Allowlist check succeeded but response could not be parsed."
-	textIssueTokenFail     = "Could not issue a token. Please try again later."
-	textTokenParseFail     = "Token was issued but response could not be parsed."
-	textTokenEmpty         = "Token response is empty. Please contact support."
-	textFAQ                = "FAQ:\n\n1) What does Get token do?\nIt issues a new MCP token for your Telegram account.\n\n2) What does Open calendar do?\nIt opens the calendar page in your browser.\n\n3) I am not on the allowlist. What should I do?\nPlease contact support to get access."
+	textAllowlisted        = "Вы в списке доступа!\n\nИспользуйте MCP, чтобы вызывать функции календаря."
+	textServiceUnavailable = "Сервис временно недоступен. Пожалуйста, попробуйте позже."
+	textAllowlistCheckFail = "Не удалось проверить доступ. Пожалуйста, попробуйте позже."
+	textAllowlistParseFail = "Проверка доступа выполнена, но не удалось разобрать ответ сервера."
+	textIssueTokenFail     = "Не удалось выдать токен. Пожалуйста, попробуйте позже."
+	textTokenParseFail     = "Токен выдан, но не удалось разобрать ответ сервера."
+	textTokenEmpty         = "Ответ с токеном пустой. Пожалуйста, обратитесь в поддержку."
+	textFAQ                = "FAQ:\n\n1) Что делает кнопка «Получить токен»?\nОна выдает новый MCP-токен для вашего Telegram-аккаунта.\n\n2) Что делает кнопка «Открыть календарь»?\nОна открывает страницу календаря в вашем браузере.\n\n3) Меня нет в списке доступа. Что делать?\nПожалуйста, обратитесь в поддержку, чтобы получить доступ."
 )
 
 func textNotAllowlisted(contact string) string {
-	return fmt.Sprintf("You are not on the allowlist yet. Please contact %s.", contact)
+	return fmt.Sprintf("Вас пока нет в списке доступа. Пожалуйста, свяжитесь с %s.", contact)
 }
 
 func textTokenIssued(token string) string {
-	return fmt.Sprintf("Here is your new MCP token:\n`%s`", token)
+	return fmt.Sprintf("Ваш новый MCP-токен:\n`%s`", token)
 }

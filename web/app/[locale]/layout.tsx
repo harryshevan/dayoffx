@@ -2,11 +2,9 @@ import { ReactNode } from "react";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { OnboardingWidget } from "@/components/onboarding-widget";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { Link } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 
 type LocaleLayoutProps = {
@@ -15,15 +13,10 @@ type LocaleLayoutProps = {
 };
 
 function TopBar() {
-  const t = useTranslations("layout");
-
   return (
     <header className="topbar">
       <LocaleSwitcher />
       <div className="topbar-actions">
-        <nav className="topnav">
-          <Link href="/calendar">{t("calendar")}</Link>
-        </nav>
         <ThemeToggle />
       </div>
     </header>

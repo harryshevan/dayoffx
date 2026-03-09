@@ -67,6 +67,7 @@ type exchangeSuccessResponse struct {
 
 type accessSuccessResponse struct {
 	Allowed          bool   `json:"allowed"`
+	HasConnection    bool   `json:"hasConnection"`
 	TelegramUsername string `json:"telegramUsername"`
 }
 
@@ -169,7 +170,7 @@ func (a *app) handleMessage(ctx context.Context, message telegramMessage) {
 			_ = a.sendTelegramMessage(ctx, chatID, textAllowlistParseFail)
 			return
 		}
-		_ = a.sendTelegramMessageWithActionButtons(ctx, chatID, textAllowlisted)
+		_ = a.sendTelegramMessageWithActionButtons(ctx, chatID, textAllowlisted, result.HasConnection)
 	}
 }
 
@@ -214,6 +215,7 @@ func (a *app) handleIssueTokenCallback(ctx context.Context, chatID int64, user *
 			return
 		}
 		_ = a.sendTelegramMessage(ctx, chatID, textTokenIssued(result.MCPToken))
+		_ = a.sendTelegramMessageWithActionButtons(ctx, chatID, textAllowlisted, true)
 	}
 }
 
@@ -324,10 +326,15 @@ func (a *app) sendTelegramMessage(ctx context.Context, chatID int64, text string
 	return nil
 }
 
-func (a *app) sendTelegramMessageWithActionButtons(ctx context.Context, chatID int64, text string) error {
+func (a *app) sendTelegramMessageWithActionButtons(ctx context.Context, chatID int64, text string, hasConnection bool) error {
+	tokenButtonText := buttonGetToken
+	if hasConnection {
+		tokenButtonText = buttonReissueToken
+	}
+
 	buttonRows := [][]map[string]string{
 		{
-			{"text": buttonGetToken, "callback_data": callbackIssueToken},
+			{"text": tokenButtonText, "callback_data": callbackIssueToken},
 		},
 	}
 	if strings.TrimSpace(a.calendarURL) != "" {

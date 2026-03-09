@@ -108,6 +108,7 @@ type privateTelegramExchangeRequest struct {
 
 type privateTelegramAccessResponse struct {
 	Allowed          bool   `json:"allowed"`
+	HasConnection    bool   `json:"hasConnection"`
 	TelegramUsername string `json:"telegramUsername"`
 }
 
@@ -1224,6 +1225,7 @@ func (a *app) checkTelegramAccess(ctx context.Context, req privateTelegramExchan
 
 	return privateTelegramAccessResponse{
 		Allowed:          true,
+		HasConnection:    record.MemberID != nil,
 		TelegramUsername: nextUsername,
 	}, 0, ""
 }

@@ -4,6 +4,7 @@ import "fmt"
 
 const (
 	buttonGetToken     = "Получить токен"
+	buttonReissueToken = "Перевыпустить токен"
 	buttonOpenCalendar = "Открыть календарь"
 
 	textAllowlisted        = "Ты с нами!\n\nИспользуй MCP, чтобы вызывать функции календаря."

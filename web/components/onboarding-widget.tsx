@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
-const EXAMPLE_TOKEN = "dayoff_example_token_do_not_use";
+const EXAMPLE_TOKEN = "YOUR_MCP_TOKEN_FROM_TG_BOT";
 const ONBOARDING_SEEN_KEY = "dayoffs-onboarding-seen-v1";
 const ONBOARDING_QUERY_PARAM = "onboarding";
 const ONBOARDING_STEP_QUERY_PARAM = "step";

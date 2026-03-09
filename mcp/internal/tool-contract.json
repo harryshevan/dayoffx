@@ -9,7 +9,7 @@
   },
   "tools": [
     {
-      "name": "createUser",
+      "name": "admin.user.create",
       "arguments": {
         "displayName": "string optional",
         "colorHex": "#RRGGBB optional",
@@ -18,7 +18,7 @@
       "behavior": "Env-admin only. Creates a member via private API and returns a new MCP token."
     },
     {
-      "name": "createVacation",
+      "name": "vacation.create",
       "arguments": {
         "from": "YYYY-MM-DD",
         "to": "YYYY-MM-DD",
@@ -29,7 +29,7 @@
       "behavior": "Creates pending vacation for token owner."
     },
     {
-      "name": "changeVacation",
+      "name": "vacation.update",
       "arguments": {
         "vacationId": "uuid",
         "newFrom": "YYYY-MM-DD",
@@ -41,7 +41,7 @@
       "behavior": "Changes token owner's vacation and resets status to pending."
     },
     {
-      "name": "removeVacation",
+      "name": "vacation.delete",
       "arguments": {
         "vacationId": "uuid",
         "displayName": "string optional",
@@ -50,14 +50,28 @@
       "behavior": "Removes token owner's vacation."
     },
     {
-      "name": "approveVacation",
+      "name": "config.color.set",
+      "arguments": {
+        "newColor": "#RRGGBB"
+      },
+      "behavior": "Changes token owner's profile color."
+    },
+    {
+      "name": "config.displayName.set",
+      "arguments": {
+        "newName": "string"
+      },
+      "behavior": "Changes token owner's display name."
+    },
+    {
+      "name": "admin.vacation.approve",
       "arguments": {
         "vacationId": "uuid"
       },
       "behavior": "Admin-only. Approves vacation and writes audit record."
     },
     {
-      "name": "issueToken",
+      "name": "admin.token.issue",
       "arguments": {
         "displayName": "string optional",
         "colorHex": "#RRGGBB optional",
@@ -66,7 +80,7 @@
       "behavior": "Admin-only. Uses env ADMIN_SECRET as caller token and issues a new member token."
     },
     {
-      "name": "revokeToken",
+      "name": "admin.token.revoke",
       "arguments": {
         "token": "string"
       },

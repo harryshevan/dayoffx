@@ -13,6 +13,7 @@ tmp
 *.tsbuildinfo
 supabase/.temp
 .gocache
+.gomodcache
 .gopath
 api/server
 mcp/server

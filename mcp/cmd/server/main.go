@@ -92,7 +92,7 @@ func requireBearer(next http.Handler) http.Handler {
 func (a *app) registerTools(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool(
-			"createUser",
+			"admin.user.create",
 			mcp.WithDescription("Create a new member and return MCP token, env-admin only"),
 			mcp.WithString("displayName", mcp.Description("Optional member display name")),
 			mcp.WithString("colorHex", mcp.Description("Optional member color #RRGGBB")),
@@ -102,7 +102,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"createVacation",
+			"vacation.create",
 			mcp.WithDescription("Create a vacation request"),
 			mcp.WithString("from", mcp.Required(), mcp.Description("Start date YYYY-MM-DD")),
 			mcp.WithString("to", mcp.Required(), mcp.Description("End date YYYY-MM-DD")),
@@ -114,7 +114,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"changeVacation",
+			"vacation.update",
 			mcp.WithDescription("Change existing vacation by id"),
 			mcp.WithString("vacationId", mcp.Required(), mcp.Description("Vacation id (uuid)")),
 			mcp.WithString("newFrom", mcp.Required(), mcp.Description("New start date YYYY-MM-DD")),
@@ -127,7 +127,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"removeVacation",
+			"vacation.delete",
 			mcp.WithDescription("Remove existing vacation by id"),
 			mcp.WithString("vacationId", mcp.Required(), mcp.Description("Vacation id (uuid)")),
 			mcp.WithString("displayName", mcp.Description("Optional new display name")),
@@ -137,7 +137,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"changeColor",
+			"config.color.set",
 			mcp.WithDescription("Change own profile color"),
 			mcp.WithString("newColor", mcp.Required(), mcp.Description("New profile color #RRGGBB")),
 		),
@@ -145,7 +145,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"changeName",
+			"config.displayName.set",
 			mcp.WithDescription("Change own display name"),
 			mcp.WithString("newName", mcp.Required(), mcp.Description("New display name")),
 		),
@@ -153,7 +153,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"approveVacation",
+			"admin.vacation.approve",
 			mcp.WithDescription("Approve vacation by id, admin only"),
 			mcp.WithString("vacationId", mcp.Required(), mcp.Description("Vacation id (uuid)")),
 		),
@@ -161,7 +161,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"issueToken",
+			"admin.token.issue",
 			mcp.WithDescription("Issue new member token, env-admin only"),
 			mcp.WithString("displayName", mcp.Description("Optional member display name")),
 			mcp.WithString("colorHex", mcp.Description("Optional member color #RRGGBB")),
@@ -171,7 +171,7 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
-			"revokeToken",
+			"admin.token.revoke",
 			mcp.WithDescription("Revoke member token, env-admin only"),
 			mcp.WithString("token", mcp.Required(), mcp.Description("Member token to revoke")),
 		),

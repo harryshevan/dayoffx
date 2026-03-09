@@ -19,7 +19,7 @@ export default function OnboardPage() {
         <h1 style={{ marginTop: 0, marginBottom: "0.5rem" }}>How to connect</h1>
         <p style={{ marginTop: 0, marginBottom: "0.75rem" }}>
           This page shows the connection format only. Real credentials are issued by an admin through MCP tool
-          <code> createUser</code>.
+          <code> admin.user.create</code>.
         </p>
         <div className="card" style={{ background: "var(--surface-soft)", borderColor: "var(--border-strong)" }}>
           <strong>Important</strong>
@@ -32,7 +32,7 @@ export default function OnboardPage() {
       <section className="card">
         <h2 style={{ marginTop: 0, marginBottom: "0.6rem" }}>How to connect</h2>
         <ol style={{ margin: 0, paddingInlineStart: "1.1rem", display: "grid", gap: "0.45rem" }}>
-          <li>Ask an admin to create your user with MCP tool <code>createUser</code>.</li>
+          <li>Ask an admin to create your user with MCP tool <code>admin.user.create</code>.</li>
           <li>Receive your personal MCP token from the admin.</li>
           <li>Open Cursor MCP settings and paste config similar to the example below.</li>
           <li>Replace both URL and token with real values from your admin.</li>

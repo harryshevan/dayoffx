@@ -215,8 +215,12 @@ func (a *app) handleIssueTokenCallback(ctx context.Context, chatID int64, user *
 			_ = a.sendTelegramMessage(ctx, chatID, textTokenEmpty)
 			return
 		}
-		_ = a.sendTelegramMessage(ctx, chatID, textTokenIssued(result.MCPToken, onboardingStepURL(a.calendarURL, 4)))
-		_ = a.sendTelegramMessageWithActionButtons(ctx, chatID, textAllowlisted, true)
+		_ = a.sendTelegramMessageWithTokenButtons(
+			ctx,
+			chatID,
+			textTokenIssued(result.MCPToken),
+			onboardingStepURL(a.calendarURL, 4),
+		)
 	}
 }
 
@@ -365,6 +369,29 @@ func (a *app) sendTelegramMessageWithActionButtons(ctx context.Context, chatID i
 	payload := map[string]any{
 		"chat_id": strconv.FormatInt(chatID, 10),
 		"text":    text,
+		"reply_markup": map[string]any{
+			"inline_keyboard": buttonRows,
+		},
+	}
+	_, err := a.callTelegram(ctx, "sendMessage", payload)
+	return err
+}
+
+func (a *app) sendTelegramMessageWithTokenButtons(ctx context.Context, chatID int64, text string, onboardingURL string) error {
+	buttonRows := [][]map[string]string{}
+	if strings.TrimSpace(onboardingURL) != "" {
+		buttonRows = append(buttonRows, []map[string]string{
+			{"text": buttonHowToUseToken, "url": onboardingURL},
+		})
+	}
+	buttonRows = append(buttonRows, []map[string]string{
+		{"text": buttonReissueToken, "callback_data": callbackIssueToken},
+	})
+
+	payload := map[string]any{
+		"chat_id":    strconv.FormatInt(chatID, 10),
+		"text":       text,
+		"parse_mode": "Markdown",
 		"reply_markup": map[string]any{
 			"inline_keyboard": buttonRows,
 		},

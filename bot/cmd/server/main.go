@@ -337,9 +337,6 @@ func (a *app) sendTelegramMessageWithActionButtons(ctx context.Context, chatID i
 			{"text": buttonOpenCalendar, "url": a.calendarURL},
 		})
 	}
-	buttonRows = append(buttonRows, []map[string]string{
-		{"text": buttonFAQ, "callback_data": callbackShowFAQ},
-	})
 
 	payload := map[string]any{
 		"chat_id": strconv.FormatInt(chatID, 10),

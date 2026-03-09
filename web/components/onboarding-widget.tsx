@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 const EXAMPLE_TOKEN = "dayoff_example_token_do_not_use";
+const ONBOARDING_SEEN_KEY = "dayoffs-onboarding-seen-v1";
 
 type Step = {
   title: string;
@@ -154,33 +155,6 @@ export function OnboardingWidget() {
   const isLast = stepIndex === steps.length - 1;
   const animationMs = 220;
 
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current);
-      }
-      if (mcpCopyTimerRef.current) {
-        clearTimeout(mcpCopyTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsVisible(false);
-        closeTimerRef.current = setTimeout(() => setIsMounted(false), animationMs);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isMounted]);
-
   const open = () => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
@@ -198,6 +172,45 @@ export function OnboardingWidget() {
     }
     closeTimerRef.current = setTimeout(() => setIsMounted(false), animationMs);
   };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+      if (mcpCopyTimerRef.current) {
+        clearTimeout(mcpCopyTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const hasSeenOnboarding = window.localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
+      if (!hasSeenOnboarding) {
+        open();
+        window.localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
+      }
+    } catch {
+      // Ignore storage access issues (e.g. private mode restrictions).
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsVisible(false);
+        closeTimerRef.current = setTimeout(() => setIsMounted(false), animationMs);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMounted]);
 
   return (
     <>

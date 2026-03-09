@@ -28,7 +28,7 @@
     "error": "Ошибка",
     "loadingCalendar": "Загрузка календаря",
     "loadingYear": "Загрузка {year}...",
-    "noVacationsForYear": "Для {year} года отпусков не найдено."
+    "noVacationsForYear": "В {year} отпусков пока нет :)"
   },
   "yearCalendar": {
     "months": {

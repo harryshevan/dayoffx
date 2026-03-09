@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -214,7 +215,7 @@ func (a *app) handleIssueTokenCallback(ctx context.Context, chatID int64, user *
 			_ = a.sendTelegramMessage(ctx, chatID, textTokenEmpty)
 			return
 		}
-		_ = a.sendTelegramMessage(ctx, chatID, textTokenIssued(result.MCPToken))
+		_ = a.sendTelegramMessage(ctx, chatID, textTokenIssued(result.MCPToken, onboardingStepURL(a.calendarURL, 4)))
 		_ = a.sendTelegramMessageWithActionButtons(ctx, chatID, textAllowlisted, true)
 	}
 }
@@ -311,6 +312,24 @@ func requestFromUser(user *telegramUser) exchangeRequest {
 		FirstName:        user.FirstName,
 		LastName:         user.LastName,
 	}
+}
+
+func onboardingStepURL(baseURL string, step int) string {
+	trimmedBaseURL := strings.TrimSpace(baseURL)
+	if trimmedBaseURL == "" {
+		return ""
+	}
+
+	parsedURL, err := url.Parse(trimmedBaseURL)
+	if err != nil {
+		return ""
+	}
+
+	query := parsedURL.Query()
+	query.Set("onboarding", "1")
+	query.Set("step", strconv.Itoa(step))
+	parsedURL.RawQuery = query.Encode()
+	return parsedURL.String()
 }
 
 func (a *app) sendTelegramMessage(ctx context.Context, chatID int64, text string) error {

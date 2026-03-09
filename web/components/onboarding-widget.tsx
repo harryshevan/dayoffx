@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 const EXAMPLE_TOKEN = "dayoff_example_token_do_not_use";
 const ONBOARDING_SEEN_KEY = "dayoffs-onboarding-seen-v1";
 const ONBOARDING_QUERY_PARAM = "onboarding";
+const ONBOARDING_STEP_QUERY_PARAM = "step";
 
 type Step = {
   title: string;
@@ -156,12 +157,13 @@ export function OnboardingWidget() {
   const isLast = stepIndex === steps.length - 1;
   const animationMs = 220;
 
-  const open = () => {
+  const open = (initialStepIndex = 0) => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-    setStepIndex(0);
+    const safeStepIndex = Math.min(Math.max(initialStepIndex, 0), steps.length - 1);
+    setStepIndex(safeStepIndex);
     setIsMounted(true);
     requestAnimationFrame(() => setIsVisible(true));
   };
@@ -189,9 +191,13 @@ export function OnboardingWidget() {
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const forceOpenFromUrl = searchParams.get(ONBOARDING_QUERY_PARAM) === "1";
+      const stepFromUrlRaw = searchParams.get(ONBOARDING_STEP_QUERY_PARAM);
+      const parsedStep = stepFromUrlRaw ? Number.parseInt(stepFromUrlRaw, 10) : Number.NaN;
+      const hasValidStepFromUrl = Number.isInteger(parsedStep);
+      const stepIndexFromUrl = hasValidStepFromUrl ? parsedStep - 1 : 0;
       const hasSeenOnboarding = window.localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
-      if (forceOpenFromUrl || !hasSeenOnboarding) {
-        open();
+      if (forceOpenFromUrl || hasValidStepFromUrl || !hasSeenOnboarding) {
+        open(stepIndexFromUrl);
         window.localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
       }
     } catch {

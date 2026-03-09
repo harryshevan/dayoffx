@@ -5,6 +5,15 @@ export type VacationDot = {
   status: Vacation["status"];
 };
 
+export type DayVacation = {
+  memberId: string;
+  displayName: string;
+  colorHex: string;
+  status: Vacation["status"];
+  fromDate: string;
+  toDate: string;
+};
+
 export type DayCell = {
   day: number;
   date: Date;
@@ -12,6 +21,7 @@ export type DayCell = {
   vacationDots?: VacationDot[];
   vacationNames?: string[];
   vacationMemberIds?: string[];
+  vacations?: DayVacation[];
 };
 
 const WEEK_START_MONDAY = 1;
@@ -44,7 +54,18 @@ export function buildMonthGrid(year: number, monthIndex: number, vacations: Vaca
           ? vacationsForDay.map((item) => ({ colorHex: item.colorHex, status: item.status }))
           : undefined,
       vacationNames: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.displayName) : undefined,
-      vacationMemberIds: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.memberId) : undefined
+      vacationMemberIds: vacationsForDay.length > 0 ? vacationsForDay.map((item) => item.memberId) : undefined,
+      vacations:
+        vacationsForDay.length > 0
+          ? vacationsForDay.map((item) => ({
+              memberId: item.memberId,
+              displayName: item.displayName,
+              colorHex: item.colorHex,
+              status: item.status,
+              fromDate: item.fromDate,
+              toDate: item.toDate
+            }))
+          : undefined
     };
   });
 }

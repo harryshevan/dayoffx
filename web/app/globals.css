@@ -266,6 +266,19 @@ select {
   transform: scale(0.98);
 }
 
+.day-clickable {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.day-popover-open {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
 .day-highlighted {
   box-shadow: inset 0 0 0 2px var(--highlight-ring);
   background: color-mix(in srgb, var(--highlight-bg) 82%, var(--surface));
@@ -301,6 +314,65 @@ select {
   bottom: 2px;
   font-size: 0.55rem;
   line-height: 1;
+  color: var(--muted);
+}
+
+.day-popover {
+  position: fixed;
+  z-index: 35;
+  width: max-content;
+  min-width: 172px;
+  max-width: min(220px, calc(100vw - 16px));
+  max-height: min(240px, calc(100vh - 16px));
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 14px 30px -22px rgba(15, 23, 42, 0.9);
+  padding: 0.5rem;
+}
+
+.day-popover-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.day-popover-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.45rem;
+  row-gap: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem;
+  background: color-mix(in srgb, var(--surface-soft) 65%, var(--surface));
+}
+
+.day-popover-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  grid-row: 1 / span 2;
+}
+
+.day-popover-dot-pending {
+  border: 1px solid var(--vac-dot-color);
+  background: linear-gradient(to right, var(--vac-dot-color) 50%, transparent 50%);
+}
+
+.day-popover-name {
+  font-size: 0.8rem;
+  line-height: 1.15;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-popover-range {
+  font-size: 0.72rem;
+  line-height: 1.15;
   color: var(--muted);
 }
 

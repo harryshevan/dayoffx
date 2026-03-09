@@ -226,7 +226,7 @@ export function OnboardingWidget() {
       <button
         type="button"
         className="onb-help-trigger"
-        onClick={open}
+        onClick={() => open()}
         aria-label={t("open")}
       >
         ?

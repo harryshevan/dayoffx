@@ -145,6 +145,11 @@ select {
   color: #fff;
 }
 
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, black);
+  border-color: transparent;
+}
+
 .theme-switch {
   border: 1px solid var(--border-strong);
   background: transparent;

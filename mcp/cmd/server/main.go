@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,17 @@ type app struct {
 	apiBaseURL  string
 	adminSecret string
 	client      *http.Client
+}
+
+type vacationListItem struct {
+	ID          string `json:"id"`
+	MemberID    string `json:"memberId"`
+	DisplayName string `json:"displayName"`
+	ColorHex    string `json:"colorHex"`
+	FromDate    string `json:"fromDate"`
+	ToDate      string `json:"toDate"`
+	Reason      string `json:"reason"`
+	Status      string `json:"status"`
 }
 
 func main() {
@@ -108,6 +120,15 @@ func (a *app) registerTools(s *server.MCPServer) {
 			mcp.WithString("telegramUsername", mcp.Required(), mcp.Description("Telegram username without @")),
 		),
 		a.whitelistTelegramUser,
+	)
+	s.AddTool(
+		mcp.NewTool(
+			"vacation.list",
+			mcp.WithDescription("List vacations in a date range for all visible members"),
+			mcp.WithString("from", mcp.Required(), mcp.Description("Range start date YYYY-MM-DD")),
+			mcp.WithString("to", mcp.Required(), mcp.Description("Range end date YYYY-MM-DD")),
+		),
+		a.listVacations,
 	)
 	s.AddTool(
 		mcp.NewTool(
@@ -229,6 +250,76 @@ func (a *app) createVacation(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	headers := profileHeaders(req)
 	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/createVacation", url.Values{}, payload, headers)
 	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) listVacations(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	fromRaw, err := req.RequireString("from")
+	if err != nil || strings.TrimSpace(fromRaw) == "" {
+		return mcp.NewToolResultError("from_required"), nil
+	}
+	toRaw, err := req.RequireString("to")
+	if err != nil || strings.TrimSpace(toRaw) == "" {
+		return mcp.NewToolResultError("to_required"), nil
+	}
+
+	fromDate, err := time.Parse("2006-01-02", strings.TrimSpace(fromRaw))
+	if err != nil {
+		return mcp.NewToolResultError("invalid_from_date"), nil
+	}
+	toDate, err := time.Parse("2006-01-02", strings.TrimSpace(toRaw))
+	if err != nil {
+		return mcp.NewToolResultError("invalid_to_date"), nil
+	}
+	if toDate.Before(fromDate) {
+		return mcp.NewToolResultError("invalid_date_range"), nil
+	}
+
+	uniqueByID := make(map[string]vacationListItem)
+	for year := fromDate.Year(); year <= toDate.Year(); year++ {
+		query := url.Values{}
+		query.Set("year", strconv.Itoa(year))
+		statusCode, body, callErr := a.callAPI(ctx, req, http.MethodGet, "/v1/vacations", query, map[string]any{}, nil)
+		if callErr != nil || statusCode >= http.StatusBadRequest {
+			return apiResult(statusCode, body, callErr), nil
+		}
+
+		var items []vacationListItem
+		if err := json.Unmarshal(body, &items); err != nil {
+			return mcp.NewToolResultError("vacation_list_decode_failed"), nil
+		}
+
+		for _, item := range items {
+			itemFrom, err := time.Parse("2006-01-02", item.FromDate)
+			if err != nil {
+				return mcp.NewToolResultError("vacation_list_invalid_from_date"), nil
+			}
+			itemTo, err := time.Parse("2006-01-02", item.ToDate)
+			if err != nil {
+				return mcp.NewToolResultError("vacation_list_invalid_to_date"), nil
+			}
+			if itemTo.Before(fromDate) || itemFrom.After(toDate) {
+				continue
+			}
+			uniqueByID[item.ID] = item
+		}
+	}
+
+	result := make([]vacationListItem, 0, len(uniqueByID))
+	for _, item := range uniqueByID {
+		result = append(result, item)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].FromDate == result[j].FromDate {
+			return result[i].ID < result[j].ID
+		}
+		return result[i].FromDate < result[j].FromDate
+	})
+
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return mcp.NewToolResultError("vacation_list_encode_failed"), nil
+	}
+	return mcp.NewToolResultText(string(encoded)), nil
 }
 
 func (a *app) createUser(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

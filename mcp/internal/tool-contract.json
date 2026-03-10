@@ -25,6 +25,14 @@
       "behavior": "Admin-only. Adds or updates Telegram whitelist entry."
     },
     {
+      "name": "vacation.list",
+      "arguments": {
+        "from": "YYYY-MM-DD",
+        "to": "YYYY-MM-DD"
+      },
+      "behavior": "Lists vacations in date range for all visible members."
+    },
+    {
       "name": "vacation.create",
       "arguments": {
         "from": "YYYY-MM-DD",

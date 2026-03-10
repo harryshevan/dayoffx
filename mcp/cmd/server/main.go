@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -169,6 +170,24 @@ func (a *app) registerTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcp.NewTool(
+			"admin.dayoff.set",
+			mcp.WithDescription("Create or update a day-off override by date, admin only"),
+			mcp.WithString("date", mcp.Required(), mcp.Description("Date in YYYY-MM-DD")),
+			mcp.WithString("isDayOff", mcp.Required(), mcp.Description("true to mark day off, false to mark working day")),
+			mcp.WithString("reason", mcp.Description("Optional reason")),
+		),
+		a.setDayOffOverride,
+	)
+	s.AddTool(
+		mcp.NewTool(
+			"admin.dayoff.unset",
+			mcp.WithDescription("Delete day-off override by date, admin only"),
+			mcp.WithString("date", mcp.Required(), mcp.Description("Date in YYYY-MM-DD")),
+		),
+		a.unsetDayOffOverride,
+	)
+	s.AddTool(
+		mcp.NewTool(
 			"admin.token.issue",
 			mcp.WithDescription("Issue new member token, env-admin only"),
 			mcp.WithString("displayName", mcp.Description("Optional member display name")),
@@ -325,6 +344,42 @@ func (a *app) approveVacation(ctx context.Context, req mcp.CallToolRequest) (*mc
 	query := url.Values{}
 	query.Set("vacationId", vacationID)
 	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/approveVacation", query, map[string]any{}, nil)
+	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) setDayOffOverride(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	date, err := req.RequireString("date")
+	if err != nil || strings.TrimSpace(date) == "" {
+		return mcp.NewToolResultError("date_required"), nil
+	}
+	isDayOffRaw, err := req.RequireString("isDayOff")
+	if err != nil || strings.TrimSpace(isDayOffRaw) == "" {
+		return mcp.NewToolResultError("isDayOff_required"), nil
+	}
+	isDayOff, err := strconv.ParseBool(strings.TrimSpace(isDayOffRaw))
+	if err != nil {
+		return mcp.NewToolResultError("isDayOff_must_be_boolean"), nil
+	}
+
+	payload := map[string]any{
+		"date":     date,
+		"isDayOff": isDayOff,
+		"reason":   strings.TrimSpace(req.GetString("reason", "")),
+	}
+	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/dayoff/set", url.Values{}, payload, nil)
+	return apiResult(statusCode, body, callErr), nil
+}
+
+func (a *app) unsetDayOffOverride(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	date, err := req.RequireString("date")
+	if err != nil || strings.TrimSpace(date) == "" {
+		return mcp.NewToolResultError("date_required"), nil
+	}
+
+	payload := map[string]any{
+		"date": date,
+	}
+	statusCode, body, callErr := a.callAPI(ctx, req, http.MethodPost, "/v1/mcp/dayoff/unset", url.Values{}, payload, nil)
 	return apiResult(statusCode, body, callErr), nil
 }
 

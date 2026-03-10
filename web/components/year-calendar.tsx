@@ -2,7 +2,7 @@ import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from
 import { useLocale, useTranslations } from "next-intl";
 import { buildMonthGrid, type DayCell, type DayVacation } from "@/lib/calendar";
 import { VacationDots } from "@/components/vacation-dots";
-import { Vacation } from "@/lib/types";
+import { DayOffOverride, Vacation } from "@/lib/types";
 
 const POPOVER_WIDTH = 220;
 const POPOVER_HEIGHT = 240;
@@ -12,6 +12,7 @@ const POPOVER_PADDING = 8;
 type YearCalendarProps = {
   year: number;
   vacations: Vacation[];
+  dayOffOverrides: DayOffOverride[];
   highlightedMemberIds?: string[];
 };
 
@@ -54,7 +55,7 @@ function getPopoverPosition(clientX: number, clientY: number): { left: number; t
   return { left, top };
 }
 
-export function YearCalendar({ year, vacations, highlightedMemberIds = [] }: YearCalendarProps) {
+export function YearCalendar({ year, vacations, dayOffOverrides, highlightedMemberIds = [] }: YearCalendarProps) {
   const t = useTranslations("yearCalendar");
   const locale = useLocale();
   const today = new Date();
@@ -123,7 +124,7 @@ export function YearCalendar({ year, vacations, highlightedMemberIds = [] }: Yea
   return (
     <section className="year-grid">
       {monthNames.map((monthName, monthIndex) => {
-        const days = buildMonthGrid(year, monthIndex, vacations);
+        const days = buildMonthGrid(year, monthIndex, vacations, dayOffOverrides);
         return (
           <article key={monthName} className="month">
             <h3>{monthName}</h3>
@@ -144,6 +145,8 @@ export function YearCalendar({ year, vacations, highlightedMemberIds = [] }: Yea
                 const hasVacations = (day.vacations?.length ?? 0) > 0;
                 const isPopoverOpen = popover?.dateKey === day.date.toISOString();
                 const dayClassName = `day ${day.inCurrentMonth ? "" : "day-muted"} ${
+                  day.isDayOff ? "day-off" : ""
+                } ${
                   highlightedMemberIds.length > 0 &&
                   day.vacationMemberIds?.some((memberId) => highlightedMemberIds.includes(memberId))
                     ? "day-highlighted"

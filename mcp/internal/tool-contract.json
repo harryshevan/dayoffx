@@ -78,6 +78,22 @@
       "behavior": "Admin-only. Approves vacation and writes audit record."
     },
     {
+      "name": "admin.dayoff.set",
+      "arguments": {
+        "date": "YYYY-MM-DD",
+        "isDayOff": "true|false",
+        "reason": "string optional"
+      },
+      "behavior": "Admin-only. Creates or updates a day-off override for a calendar date."
+    },
+    {
+      "name": "admin.dayoff.unset",
+      "arguments": {
+        "date": "YYYY-MM-DD"
+      },
+      "behavior": "Admin-only. Removes a day-off override for a calendar date."
+    },
+    {
       "name": "admin.token.issue",
       "arguments": {
         "displayName": "string optional",

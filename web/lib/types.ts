@@ -23,3 +23,9 @@ export type Vacation = {
   reason: string;
   status: VacationStatus;
 };
+
+export type DayOffOverride = {
+  date: string;
+  isDayOff: boolean;
+  reason: string;
+};

@@ -1,4 +1,4 @@
-import { Vacation } from "./types";
+import { DayOffOverride, Vacation } from "./types";
 
 export type VacationDot = {
   colorHex: string;
@@ -18,6 +18,7 @@ export type DayCell = {
   day: number;
   date: Date;
   inCurrentMonth: boolean;
+  isDayOff: boolean;
   vacationDots?: VacationDot[];
   vacationNames?: string[];
   vacationMemberIds?: string[];
@@ -33,7 +34,16 @@ function toIsoDateString(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function buildMonthGrid(year: number, monthIndex: number, vacations: Vacation[]): DayCell[] {
+export function buildMonthGrid(
+  year: number,
+  monthIndex: number,
+  vacations: Vacation[],
+  dayOffOverrides: DayOffOverride[]
+): DayCell[] {
+  const dayOffLookup = new Map<string, boolean>();
+  for (const item of dayOffOverrides) {
+    dayOffLookup.set(item.date, item.isDayOff);
+  }
   const firstDayOfMonth = new Date(Date.UTC(year, monthIndex, 1));
   const firstWeekday = (firstDayOfMonth.getUTCDay() + 7 - WEEK_START_MONDAY) % 7;
   const gridStart = new Date(firstDayOfMonth);
@@ -43,12 +53,16 @@ export function buildMonthGrid(year: number, monthIndex: number, vacations: Vaca
     const date = new Date(gridStart);
     date.setUTCDate(gridStart.getUTCDate() + index);
     const dateString = toIsoDateString(date);
+    const overrideValue = dayOffLookup.get(dateString);
+    const isWeekend = date.getUTCDay() === 0 || date.getUTCDay() === 6;
+    const isDayOff = overrideValue ?? isWeekend;
 
     const vacationsForDay = vacations.filter((item) => dateString >= item.fromDate && dateString <= item.toDate);
     return {
       day: date.getUTCDate(),
       date,
       inCurrentMonth: date.getUTCMonth() === monthIndex,
+      isDayOff,
       vacationDots:
         vacationsForDay.length > 0
           ? vacationsForDay.map((item) => ({ colorHex: item.colorHex, status: item.status }))

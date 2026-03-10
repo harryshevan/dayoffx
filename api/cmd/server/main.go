@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -56,6 +57,12 @@ type vacationDTO struct {
 	ToDate      string `json:"toDate"`
 	Reason      string `json:"reason"`
 	Status      string `json:"status"`
+}
+
+type dayOffOverrideDTO struct {
+	Date     string `json:"date"`
+	IsDayOff bool   `json:"isDayOff"`
+	Reason   string `json:"reason"`
 }
 
 type createVacationRequest struct {
@@ -133,6 +140,16 @@ type revokeTokenRequest struct {
 	Token string `json:"token"`
 }
 
+type setDayOffRequest struct {
+	Date     string `json:"date"`
+	IsDayOff bool   `json:"isDayOff"`
+	Reason   string `json:"reason"`
+}
+
+type unsetDayOffRequest struct {
+	Date string `json:"date"`
+}
+
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 const (
@@ -188,9 +205,12 @@ func main() {
 	mux.HandleFunc("/v1/private/telegram/access", handler.privateTelegramAccess)
 	mux.HandleFunc("/v1/private/telegram/exchange", handler.privateTelegramExchange)
 	mux.HandleFunc("/v1/vacations", handler.listVacations)
+	mux.HandleFunc("/v1/dayoffs", handler.listDayOffOverrides)
 	mux.HandleFunc("/v1/mcp/createVacation", handler.auth(handler.createVacation))
 	mux.HandleFunc("/v1/mcp/changeVacation", handler.auth(handler.changeVacation))
 	mux.HandleFunc("/v1/mcp/removeVacation", handler.auth(handler.removeVacation))
+	mux.HandleFunc("/v1/mcp/dayoff/set", handler.auth(handler.setDayOff))
+	mux.HandleFunc("/v1/mcp/dayoff/unset", handler.auth(handler.unsetDayOff))
 	mux.HandleFunc("/v1/mcp/changeColor", handler.auth(handler.changeColor))
 	mux.HandleFunc("/v1/mcp/changeName", handler.auth(handler.changeName))
 	mux.HandleFunc("/v1/mcp/approveVacation", handler.auth(handler.approveVacation))
@@ -205,7 +225,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      withCORS(mux),
+		Handler:      withCORS(withErrorLogging(mux)),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  30 * time.Second,
@@ -228,6 +248,83 @@ func withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+	body       bytes.Buffer
+}
+
+func (w *loggingResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *loggingResponseWriter) Write(data []byte) (int, error) {
+	if w.statusCode == 0 {
+		w.statusCode = http.StatusOK
+	}
+	const bodyLimit = 2048
+	if w.body.Len() < bodyLimit {
+		remaining := bodyLimit - w.body.Len()
+		if len(data) > remaining {
+			w.body.Write(data[:remaining])
+		} else {
+			w.body.Write(data)
+		}
+	}
+	return w.ResponseWriter.Write(data)
+}
+
+func withErrorLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedAt := time.Now()
+		lw := &loggingResponseWriter{ResponseWriter: w}
+
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				log.Printf("panic method=%s path=%s query=%q reason=%v", r.Method, r.URL.Path, r.URL.RawQuery, recovered)
+				writeError(lw, http.StatusInternalServerError, "internal_panic")
+			}
+
+			if lw.statusCode == 0 {
+				lw.statusCode = http.StatusOK
+			}
+			if lw.statusCode < http.StatusInternalServerError {
+				return
+			}
+
+			errorCode := extractErrorCode(lw.body.Bytes())
+			log.Printf(
+				"http_error method=%s path=%s query=%q status=%d error=%s duration_ms=%d",
+				r.Method,
+				r.URL.Path,
+				r.URL.RawQuery,
+				lw.statusCode,
+				errorCode,
+				time.Since(startedAt).Milliseconds(),
+			)
+		}()
+
+		next.ServeHTTP(lw, r)
+	})
+}
+
+func extractErrorCode(responseBody []byte) string {
+	var payload map[string]any
+	if err := json.Unmarshal(responseBody, &payload); err != nil {
+		return "unknown"
+	}
+	errorValue, ok := payload["error"]
+	if !ok {
+		return "unknown"
+	}
+	errorCode, ok := errorValue.(string)
+	if !ok || errorCode == "" {
+		return "unknown"
+	}
+	return errorCode
 }
 
 func (a *app) healthz(w http.ResponseWriter, r *http.Request) {
@@ -444,6 +541,55 @@ func (a *app) listVacations(w http.ResponseWriter, r *http.Request) {
 		item.MemberID = memberID.String()
 		item.FromDate = fromDate.Format("2006-01-02")
 		item.ToDate = toDate.Format("2006-01-02")
+		result = append(result, item)
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (a *app) listDayOffOverrides(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+
+	yearValue := r.URL.Query().Get("year")
+	year, err := strconv.Atoi(yearValue)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_year")
+		return
+	}
+
+	from := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+
+	rows, err := a.db.Query(
+		r.Context(),
+		`select date, is_day_off, reason
+		 from calendar_day_overrides
+		 where date >= $1 and date <= $2
+		 order by date asc`,
+		from, to,
+	)
+	if err != nil {
+		log.Printf("db query failed endpoint=%s error=%v", r.URL.Path, err)
+		writeError(w, http.StatusInternalServerError, "dayoff_query_failed")
+		return
+	}
+	defer rows.Close()
+
+	result := make([]dayOffOverrideDTO, 0)
+	for rows.Next() {
+		var (
+			item dayOffOverrideDTO
+			date time.Time
+		)
+		if err := rows.Scan(&date, &item.IsDayOff, &item.Reason); err != nil {
+			log.Printf("db scan failed endpoint=%s error=%v", r.URL.Path, err)
+			writeError(w, http.StatusInternalServerError, "dayoff_scan_failed")
+			return
+		}
+		item.Date = date.Format("2006-01-02")
 		result = append(result, item)
 	}
 
@@ -718,6 +864,93 @@ func (a *app) removeVacation(w http.ResponseWriter, r *http.Request, auth authCo
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"vacationId": vacationID.String()})
+}
+
+func (a *app) setDayOff(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.Role != "admin" {
+		writeError(w, http.StatusForbidden, "admin_only")
+		return
+	}
+
+	var req setDayOffRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	date, ok := parseISODate(req.Date)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid_date")
+		return
+	}
+
+	reason := strings.TrimSpace(req.Reason)
+	var createdBy any
+	if !auth.IsEnvAdmin {
+		createdBy = auth.MemberID
+	}
+
+	_, err := a.db.Exec(
+		r.Context(),
+		`insert into calendar_day_overrides (date, is_day_off, reason, created_by_member_id, created_at, updated_at)
+		 values ($1, $2, $3, $4, now(), now())
+		 on conflict (date)
+		 do update set
+		   is_day_off = excluded.is_day_off,
+		   reason = excluded.reason,
+		   created_by_member_id = excluded.created_by_member_id,
+		   updated_at = now()`,
+		date, req.IsDayOff, reason, createdBy,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "dayoff_set_failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, dayOffOverrideDTO{
+		Date:     date.Format("2006-01-02"),
+		IsDayOff: req.IsDayOff,
+		Reason:   reason,
+	})
+}
+
+func (a *app) unsetDayOff(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.Role != "admin" {
+		writeError(w, http.StatusForbidden, "admin_only")
+		return
+	}
+
+	var req unsetDayOffRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	date, ok := parseISODate(req.Date)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid_date")
+		return
+	}
+
+	_, err := a.db.Exec(
+		r.Context(),
+		`delete from calendar_day_overrides where date = $1`,
+		date,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "dayoff_unset_failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"date": date.Format("2006-01-02"), "status": "unset"})
 }
 
 func (a *app) changeColor(w http.ResponseWriter, r *http.Request, auth authContext) {
@@ -1447,6 +1680,14 @@ func parseDateRange(fromRaw, toRaw string) (time.Time, time.Time, bool) {
 		return time.Time{}, time.Time{}, false
 	}
 	return fromDate.UTC(), toDate.UTC(), true
+}
+
+func parseISODate(raw string) (time.Time, bool) {
+	date, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return date.UTC(), true
 }
 
 func isUniqueViolation(err error) bool {

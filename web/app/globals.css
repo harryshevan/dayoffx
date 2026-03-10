@@ -282,11 +282,24 @@ select {
   padding: 2px 4px;
   background: var(--surface-soft);
   position: relative;
+  overflow: hidden;
   transition:
     background-color var(--dur-fast) var(--ease-standard),
     border-color var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard),
     box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.day-off::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(220, 38, 38, 0.28) 0 5px,
+    rgba(220, 38, 38, 0.14) 5px 10px
+  );
 }
 
 .day:hover {

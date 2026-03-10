@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { getVacations } from "@/lib/api";
-import { Vacation } from "@/lib/types";
+import { getDayOffOverrides, getVacations } from "@/lib/api";
+import { DayOffOverride, Vacation } from "@/lib/types";
 import { YearCalendar } from "@/components/year-calendar";
 
 function getCurrentYear(): number {
@@ -15,6 +15,7 @@ export default function CalendarPage() {
   const currentYear = getCurrentYear();
   const [year, setYear] = useState(currentYear);
   const [vacations, setVacations] = useState<Vacation[]>([]);
+  const [dayOffOverrides, setDayOffOverrides] = useState<DayOffOverride[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +42,11 @@ export default function CalendarPage() {
     }
     setError(null);
 
-    getVacations(year)
-      .then((data) => {
+    Promise.all([getVacations(year), getDayOffOverrides(year)])
+      .then(([vacationData, dayOffData]) => {
         if (requestIdRef.current === requestId) {
-          setVacations(data);
+          setVacations(vacationData);
+          setDayOffOverrides(dayOffData);
           hasLoadedOnceRef.current = true;
         }
       })
@@ -180,7 +182,12 @@ export default function CalendarPage() {
             ))}
           </section>
         ) : (
-          <YearCalendar year={year} vacations={vacations} highlightedMemberIds={highlightedMemberIds} />
+          <YearCalendar
+            year={year}
+            vacations={vacations}
+            dayOffOverrides={dayOffOverrides}
+            highlightedMemberIds={highlightedMemberIds}
+          />
         )}
         {isRefreshing ? (
           <div className="calendar-refresh-overlay" role="status" aria-live="polite">

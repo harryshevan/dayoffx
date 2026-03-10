@@ -22,7 +22,7 @@
       "arguments": {
         "telegramUsername": "string required"
       },
-      "behavior": "Env-admin only. Adds or updates Telegram whitelist entry in private API."
+      "behavior": "Admin-only. Adds or updates Telegram whitelist entry."
     },
     {
       "name": "vacation.create",

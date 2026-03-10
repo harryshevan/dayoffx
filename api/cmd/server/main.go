@@ -194,6 +194,7 @@ func main() {
 	mux.HandleFunc("/v1/mcp/changeColor", handler.auth(handler.changeColor))
 	mux.HandleFunc("/v1/mcp/changeName", handler.auth(handler.changeName))
 	mux.HandleFunc("/v1/mcp/approveVacation", handler.auth(handler.approveVacation))
+	mux.HandleFunc("/v1/mcp/telegram/whitelist", handler.auth(handler.mcpTelegramWhitelist))
 	mux.HandleFunc("/v1/mcp/issueToken", handler.auth(handler.issueToken))
 	mux.HandleFunc("/v1/mcp/revokeToken", handler.auth(handler.revokeToken))
 
@@ -851,6 +852,36 @@ func (a *app) approveVacation(w http.ResponseWriter, r *http.Request, auth authC
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"vacationId": vacationID.String(), "status": "approved"})
+}
+
+func (a *app) mcpTelegramWhitelist(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if auth.Role != "admin" {
+		writeError(w, http.StatusForbidden, "admin_only")
+		return
+	}
+
+	var req privateTelegramWhitelistRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	telegramUsername := normalizeTelegramUsername(req.TelegramUsername)
+	if telegramUsername == "" {
+		writeError(w, http.StatusBadRequest, "telegram_username_required")
+		return
+	}
+
+	result, statusCode, errorCode := a.upsertTelegramWhitelist(r.Context(), telegramUsername)
+	if errorCode != "" {
+		writeError(w, statusCode, errorCode)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (a *app) issueToken(w http.ResponseWriter, r *http.Request, auth authContext) {

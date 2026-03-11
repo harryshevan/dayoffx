@@ -1,19 +1,9 @@
 import { DayOffOverride, Vacation } from "./types";
 
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === "development" ? "http://localhost:8080" : "");
-
-function getApiBaseUrl(): string {
-  if (apiBaseUrl) {
-    return apiBaseUrl;
-  }
-
-  throw new Error("NEXT_PUBLIC_API_URL is not set");
-}
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim() || "/api";
 
 export async function getVacations(year: number): Promise<Vacation[]> {
-  const response = await fetch(`${getApiBaseUrl()}/v1/vacations?year=${year}`, {
+  const response = await fetch(`${apiBaseUrl}/v1/vacations?year=${year}`, {
     next: { revalidate: 0 }
   });
 
@@ -25,7 +15,7 @@ export async function getVacations(year: number): Promise<Vacation[]> {
 }
 
 export async function getDayOffOverrides(year: number): Promise<DayOffOverride[]> {
-  const response = await fetch(`${getApiBaseUrl()}/v1/dayoffs?year=${year}`, {
+  const response = await fetch(`${apiBaseUrl}/v1/dayoffs?year=${year}`, {
     next: { revalidate: 0 }
   });
 

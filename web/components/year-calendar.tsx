@@ -125,8 +125,9 @@ export function YearCalendar({ year, vacations, dayOffOverrides, highlightedMemb
     <section className="year-grid">
       {monthNames.map((monthName, monthIndex) => {
         const days = buildMonthGrid(year, monthIndex, vacations, dayOffOverrides);
+        const isCurrentMonth = year === todayYear && monthIndex === todayMonth;
         return (
-          <article key={monthName} className="month">
+          <article key={monthName} className={`month ${isCurrentMonth ? "month-current" : ""}`}>
             <h3>{monthName}</h3>
             <div className="weekday-grid" aria-hidden="true">
               {weekdayNames.map((weekday) => (
